@@ -42,41 +42,56 @@ chat history or project memories are included in the package.
 
 One command per tool — run whichever you want, or both.
 
-**Claude Code — Windows** (PowerShell):
+<details open>
+<summary><b>Windows</b> — PowerShell</summary>
+
+**Claude Code**
 
 ```powershell
 irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1 | iex
 ```
 
-**Claude Code — WSL** (bash, inside the distro):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-wsl.sh | bash
-```
-
-**Claude Code — macOS** (bash):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-macos.sh | bash
-```
-
-**Copilot CLI — Windows** (PowerShell):
+**Copilot CLI**
 
 ```powershell
 irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-windows.ps1 | iex
 ```
 
-**Copilot CLI — WSL** (bash, inside the distro):
+</details>
+
+<details>
+<summary><b>WSL</b> — bash, inside the distro</summary>
+
+**Claude Code**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-wsl.sh | bash
+```
+
+**Copilot CLI**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-wsl.sh | bash
 ```
 
-**Copilot CLI — macOS** (bash):
+</details>
+
+<details>
+<summary><b>macOS</b> — bash</summary>
+
+**Claude Code**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-macos.sh | bash
+```
+
+**Copilot CLI**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-macos.sh | bash
 ```
+
+</details>
 
 All are idempotent — safe to re-run, and anything already installed is skipped.
 
@@ -87,21 +102,28 @@ All are idempotent — safe to re-run, and anything already installed is skipped
 tool's own official installer. Nothing already installed is upgraded, and you
 log in with your own account either way.
 
-**Windows:**
+<details open>
+<summary><b>Windows</b></summary>
 
 - Windows 11 with `winget` available.
 - **An elevated PowerShell if Node.js is not yet installed** — the official
   Node.js MSI cannot self-elevate. If you already have `node`, a normal prompt
   is fine. Nothing else here needs elevation.
 
-**WSL:**
+</details>
+
+<details>
+<summary><b>WSL</b></summary>
 
 - `sudo` rights, plus `curl` and `tar`.
 - **`python3` is required, not optional** — it validates the installed JSON and
   every hook runs under it (and for Claude it also renders `settings.json`). The
   installer stops early if it is missing.
 
-**macOS:**
+</details>
+
+<details>
+<summary><b>macOS</b> — ⚠️ untested on hardware</summary>
 
 - An admin account. Homebrew is installed if missing and will ask for your
   password; `curl` and `tar` already ship with the OS.
@@ -113,19 +135,42 @@ log in with your own account either way.
   [`claude/macos/README.md`](claude/macos/README.md) and
   [`copilot/macos/README.md`](copilot/macos/README.md).
 
+</details>
+
 ### Passing flags
 
-On Windows, `| iex` cannot pass arguments, so build a scriptblock instead:
+<details open>
+<summary><b>Windows</b> — build a scriptblock</summary>
+
+`| iex` cannot pass arguments, so pipe the script into a scriptblock instead:
 
 ```powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1))) -SkipToolchain -SkipPlugins
 ```
 
-On WSL and macOS, flags pass straight through after `-s --`:
+</details>
+
+<details>
+<summary><b>WSL</b> — after <code>-s --</code></summary>
+
+Flags pass straight through:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-wsl.sh | bash -s -- --skip-toolchain --skip-plugins
 ```
+
+</details>
+
+<details>
+<summary><b>macOS</b> — after <code>-s --</code></summary>
+
+Same as WSL, with the macOS bootstrap:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-macos.sh | bash -s -- --skip-toolchain --skip-plugins
+```
+
+</details>
 
 The full installer flag list is in [`claude/README.md`](claude/README.md),
 [`claude/wsl/README.md`](claude/wsl/README.md),
@@ -258,7 +303,7 @@ $ref = "v1.0.0"   # a tag, branch or commit SHA
 
 Add any installer flags after `-Ref $ref`.
 
-The two permissive Claude settings are covered under
+The permissive Claude setting is covered under
 [Before you run it](#before-you-run-it); the per-tool READMEs go into more
 detail.
 
