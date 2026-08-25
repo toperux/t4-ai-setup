@@ -15,6 +15,29 @@ your own account.
 | WSL | ✅ — [detail](claude/wsl/README.md) | ✅ — [detail](copilot/wsl/README.md) |
 | macOS | ✅ — [detail](claude/macos/README.md) (untested on hardware) | ✅ — [detail](copilot/macos/README.md) (untested on hardware) |
 
+## Before you run it
+
+This replaces your **user-level** config for the tool you install, and one Claude
+setting is deliberately permissive — worth a conscious decision rather than a
+surprise, especially if you are rolling this out to other people:
+
+- `permissions.defaultMode: "auto"` — tool calls auto-approve instead of
+  prompting.
+
+Claude Code's own dangerous-mode warning is left in place, so that prompt still
+appears. A deny list (`.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`,
+`web.config`, `local.settings.json`) and a PreToolUse hook also block reads and
+edits of secret-ish files — 19 rules on WSL and macOS, 21 on Windows, which also
+denies `Bash(cd *)` and `Bash(pushd *)` for the Git Bash reason in the global
+instructions. The deny list assumes .NET / Azure Functions projects. Skim
+[`claude/windows/config/settings.json`](claude/windows/config/settings.json)
+(the WSL and macOS overlays carry the same settings) and adjust before running
+if that doesn't suit you. The Copilot package has no equivalent setting.
+
+Your existing config is git-committed before anything is written, so there is an
+undo path — each per-tool README has the exact restore command. No credentials,
+chat history or project memories are included in the package.
+
 ## Install
 
 One command per tool — run whichever you want, or both.
@@ -222,9 +245,9 @@ $ref = "v1.0.0"   # a tag, branch or commit SHA
 
 Add any installer flags after `-Ref $ref`.
 
-Two settings are opinionated and worth reviewing before your first run —
-`permissions.defaultMode: "auto"` and `skipDangerousModePermissionPrompt: true`.
-See the per-tool READMEs.
+The two permissive Claude settings are covered under
+[Before you run it](#before-you-run-it); the per-tool READMEs go into more
+detail.
 
 ## Repository layout
 

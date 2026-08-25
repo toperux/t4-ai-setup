@@ -144,10 +144,12 @@ them):
 
 ## Before your first run
 
-Two settings are opinionated and worth a look:
+One setting is opinionated and worth a look:
 
 - `permissions.defaultMode: "auto"` — tools auto-approve rather than prompting.
-- `skipDangerousModePermissionPrompt: true` — suppresses the dangerous-mode warning.
+
+Claude Code's own dangerous-mode warning is left alone, so that prompt still
+appears.
 
 The deny-list also assumes .NET / Azure Functions projects (`appsettings.json`,
 `web.config`, `local.settings.json`). Skim `windows/config/settings.json` and
