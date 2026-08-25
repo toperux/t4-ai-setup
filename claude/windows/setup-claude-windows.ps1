@@ -132,10 +132,15 @@ function Add-UserPath {
 function Install-WingetPackage {
     param(
         [Parameter(Mandatory)][string]$Id,
-        [Parameter(Mandatory)][string]$Command
+        [Parameter(Mandatory)][string]$Command,
+        # For packages where "the command resolves" is not the same question as
+        # "the package is installed". The .NET SDK is the case: a runtime-only
+        # install, or an older SDK, both put `dotnet` on PATH with nothing
+        # csharp-ls can build against. The caller has already decided.
+        [switch]$SkipPresenceCheck
     )
 
-    if (Get-Command $Command -ErrorAction SilentlyContinue) {
+    if (-not $SkipPresenceCheck -and (Get-Command $Command -ErrorAction SilentlyContinue)) {
         return
     }
 
@@ -237,9 +242,24 @@ function Install-DotNetLts {
     }
     if ($sdks) {
         Write-Host ".NET is installed but no $major.x SDK is present; adding it."
+    } else {
+        Write-Host "No .NET SDK is present; installing the $major.x SDK."
     }
 
-    Install-WingetPackage -Id "Microsoft.DotNet.SDK.$major" -Command "dotnet"
+    # -SkipPresenceCheck: `dotnet` resolving is precisely what does not settle
+    # this. A runtime-only install puts dotnet on PATH with an empty
+    # --list-sdks (verified: exit 0, no output), and an older SDK puts a
+    # different major there - in both cases the presence check would return
+    # early and the message above would be a lie.
+    Install-WingetPackage -Id "Microsoft.DotNet.SDK.$major" -Command "dotnet" -SkipPresenceCheck
+
+    # Post-condition, because the failure it prevents is three steps away and
+    # unrecognisable there: `dotnet tool install -g csharp-ls` exits 155 with
+    # "No .NET SDKs were found" when the SDK did not actually land.
+    $sdks = Invoke-Native { & dotnet --list-sdks 2>$null }
+    if (($sdks | Where-Object { $_ -match "^\s*$major\." } | Measure-Object).Count -eq 0) {
+        throw "Microsoft.DotNet.SDK.$major was installed, but 'dotnet --list-sdks' still reports no $major.x SDK."
+    }
 }
 
 function Test-Elevated {

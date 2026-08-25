@@ -128,13 +128,22 @@ install_pkg() {
 # Toolchain
 # ---------------------------------------------------------------------------
 
+# `have dotnet` is the wrong question: the runtime ships the same `dotnet` host,
+# so a runtime-only machine has it on PATH with nothing behind it. Verified on
+# both Linux and Windows - `dotnet --list-sdks` prints nothing and still exits 0
+# there, and `dotnet tool install` then fails with "No .NET SDKs were found"
+# (exit 155), which is unrecognisable that far from the cause.
+have_dotnet_sdk() {
+  have dotnet && [ -n "$(dotnet --list-sdks 2>/dev/null)" ]
+}
+
 install_dotnet() {
-  have dotnet && return 0
+  have_dotnet_sdk && return 0
   # Newest LTS first. 9.0 is deliberately skipped: it is STS, and the version
   # policy is LTS only.
   local v
   for v in 10.0 8.0; do
-    if install_pkg dotnet "dotnet-sdk-$v" 2>/dev/null && have dotnet; then
+    if install_pkg dotnet "dotnet-sdk-$v" 2>/dev/null && have_dotnet_sdk; then
       return 0
     fi
   done

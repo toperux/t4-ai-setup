@@ -157,8 +157,17 @@ brew_install() {
 # Toolchain
 # ---------------------------------------------------------------------------
 
+# `have dotnet` is the wrong question: the runtime ships the same `dotnet` host,
+# so a runtime-only machine has it on PATH with nothing behind it. Verified on
+# both Linux and Windows - `dotnet --list-sdks` prints nothing and still exits 0
+# there, and `dotnet tool install` then fails with "No .NET SDKs were found"
+# (exit 155), which is unrecognisable that far from the cause.
+have_dotnet_sdk() {
+  have dotnet && [ -n "$(dotnet --list-sdks 2>/dev/null)" ]
+}
+
 install_dotnet() {
-  have dotnet && return 0
+  have_dotnet_sdk && return 0
   # Microsoft's own script, with the channel that *means* "the newest LTS" - so
   # this needs no editing when .NET 11 ships.
   #
@@ -176,6 +185,7 @@ install_dotnet() {
     # runtime through DOTNET_ROOT, so csharp-ls would not start without this.
     export DOTNET_ROOT="$HOME/.dotnet"
     persist_line "export DOTNET_ROOT=\"\$HOME/.dotnet\""
+    have_dotnet_sdk || warn "The .NET install reports no SDK; csharp-ls will be skipped."
   else
     warn "The .NET SDK did not install; csharp-ls will be skipped."
     warn "Install it manually from https://dot.net and re-run."
