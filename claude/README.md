@@ -8,10 +8,12 @@ project memories are included; you log in with your own account.
 ## Prerequisites
 
 - Windows 11 with `winget` available
-- Claude Code already installed and logged in (`claude --version` works)
 - **An elevated PowerShell if Node.js is not yet installed** — the official
   Node.js MSI needs admin rights. If you already have `node`, a normal prompt
-  is fine.
+  is fine. Nothing else here needs elevation, Claude Code included.
+
+Claude Code itself is installed if it's missing; you log in with your own
+account.
 
 ## Run it
 
@@ -78,6 +80,7 @@ Command-line tools (each skipped if already on PATH):
 | --- | --- | --- |
 | `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook rewrites every Bash tool call through `rtk hook claude`. Without it on PATH, every Bash call fails. Note it comes from **git, not crates.io** — see the warning below. |
 | `graphify` | `uv tool install graphifyy` | Backs the bundled graphify skill and its two hooks. The PyPI package really is spelled with two y's. |
+| `claude` | `https://claude.ai/install.ps1` | Claude Code itself. Anthropic's own installer: user scope, no elevation, SHA256-verified against a signed manifest. Only when missing — an existing install is never upgraded, and a running one is never replaced, because a running one isn't missing. |
 | `git` | winget `Git.Git` | Used by the statusline and by the config backup step. |
 | `py` 3.14 | winget `Python.PythonInstallManager` | Runs the two Python hooks. The script also makes sure a plain `python` resolves, since that is what the hook command uses. |
 | Node.js LTS | Official MSI from nodejs.org | Resolved from the live release feed, not pinned. Needed for the TypeScript language server. |
@@ -159,6 +162,21 @@ adjust before running if any of that doesn't suit you.
   nodejs.org publishes before it is executed.
 - **The backup repo is created in `~/.claude` itself**, never a parent. If your
   home directory happens to be a git repo, this won't commit into it.
+- **An existing repo is never reconfigured.** If `~/.claude` is already a git
+  repo, the installer commits and nothing else: your `.gitignore` is not edited,
+  and nothing is untracked. It is your repo — what it captures is your call.
+  Adding an ignore rule would not untrack what is already there, but it *would*
+  stop `git add` from picking up new files, so tomorrow's sessions would
+  silently stop being backed up while yesterday's stayed. It does warn if the
+  repo tracks `.credentials.json`, since those are live OAuth tokens, but it
+  does not act — `git -C $HOME\.claude rm --cached .credentials.json` is yours
+  to run. That check is the presence of `.git` in the directory itself, so it
+  still holds when `.claude` is a junction or symlink into a dotfiles checkout.
+- **A repo the installer creates gets a sensible `.gitignore`.** Credentials,
+  setup residue, and bulk runtime state (`projects/`, `file-history/`,
+  `history.jsonl`, `plugins/`, the caches) are excluded from the start, so a
+  fresh machine never begins committing megabytes of session data that is no use
+  as an undo point.
 
 ## A note on CLAUDE.md and graphify
 

@@ -87,20 +87,18 @@ correct_rtk() { rtk gain >/dev/null 2>&1; }
 # PATH
 # ---------------------------------------------------------------------------
 
-# The login shell has been zsh since Catalina, so ~/.zprofile is the file that
-# matters and it is created if absent. The bash files are only appended to when
-# they already exist - writing them would be presumptuous on a zsh machine.
 persist_line() {
-  local line="$1" profile created=0
+  local line="$1" profile
+  # ~/.zprofile is written whether or not it already exists, because zsh has been
+  # the login shell since Catalina and that file is what decides what a new
+  # terminal sees. The others are only appended to when they are already there -
+  # creating them would be presumptuous. Writing only-if-exists across the board
+  # would strand someone who has just a ~/.bash_profile: the line would land
+  # somewhere their login shell never reads.
   for profile in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.profile"; do
-    if [ -f "$profile" ]; then
-      grep -qxF "$line" "$profile" || printf '\n%s\n' "$line" >> "$profile"
-      created=1
-    fi
+    [ "$profile" = "$HOME/.zprofile" ] || [ -f "$profile" ] || continue
+    grep -qxF "$line" "$profile" 2>/dev/null || printf '\n%s\n' "$line" >> "$profile"
   done
-  if [ "$created" -eq 0 ]; then
-    printf '\n%s\n' "$line" >> "$HOME/.zprofile"
-  fi
 }
 
 # Prepend for this run, and persist so a new terminal keeps it.
@@ -139,7 +137,9 @@ install_homebrew() {
       break
     fi
   done
-  have brew || die "Homebrew is required but is not on PATH after installing it."
+  have brew || die "Homebrew is required and is not on PATH. If its installer failed above, run it
+yourself (https://brew.sh), then re-run this script - or pass --skip-toolchain to
+install only the configuration."
 }
 
 # brew_install <command> <formula>
@@ -156,35 +156,55 @@ brew_install() {
 
 install_dotnet() {
   have dotnet && return 0
-  # A cask, not a formula, and it can want an interactive password. csharp-ls is
-  # the only casualty if it does not land, so this stays best-effort.
+  # Microsoft's own script, with the channel that *means* "the newest LTS" - so
+  # this needs no editing when .NET 11 ships.
   #
-  # Unlike winget and apt, Homebrew ships one `dotnet-sdk` cask tracking the
-  # current release rather than a cask per LTS, so the LTS-only version policy
-  # cannot be expressed here.
-  say "Installing the .NET SDK (for csharp-ls)"
-  brew install --cask dotnet-sdk || {
+  # Homebrew cannot express that policy. There are dotnet-sdk@8 and @9 casks but
+  # no @10, so the current LTS is only reachable as the unversioned `dotnet-sdk`
+  # cask - which silently stops being LTS the day 11 is released. The script also
+  # installs under $HOME with no sudo, where the cask can want a password.
+  #
+  # Best-effort either way: csharp-ls is the only casualty if it does not land.
+  say "Installing the .NET SDK (latest LTS, for csharp-ls)"
+  if curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel LTS; then
+    add_path "$HOME/.dotnet"
+    # The script installs to $HOME/.dotnet, which is not where macOS looks by
+    # default (/usr/local/share/dotnet). A global tool's launcher finds its
+    # runtime through DOTNET_ROOT, so csharp-ls would not start without this.
+    export DOTNET_ROOT="$HOME/.dotnet"
+    persist_line "export DOTNET_ROOT=\"\$HOME/.dotnet\""
+  else
     warn "The .NET SDK did not install; csharp-ls will be skipped."
     warn "Install it manually from https://dot.net and re-run."
-  }
+  fi
   add_path "$HOME/.dotnet/tools"
 }
 
 install_toolchain() {
   install_homebrew
 
-  brew_install git     git     || true
-  brew_install jq      jq      || true
-  brew_install python3 python  || true
-  brew_install uv      uv      || true
+  brew_install git git || true
+  brew_install jq  jq  || true
+  brew_install uv  uv  || true
+
+  # Gated on python_ready, NOT on `have python3`. /usr/bin/python3 exists as a
+  # Command Line Tools stub on a Mac that has none, so a presence check passes,
+  # Homebrew's python is never installed, and the run then dies at the
+  # python_ready gate after the toolchain step - having installed everything
+  # else first.
+  if ! python_ready; then
+    say "Installing python via Homebrew"
+    brew install python || warn "Failed to install python."
+  fi
 
   # uv tool binaries (graphify) and dotnet global tools.
   add_path "$HOME/.local/bin"
   add_path "$HOME/.dotnet/tools"
 
-  # Claude Code itself. The Windows and WSL installers expect it to be there
-  # already; on macOS the official one-liner is cheap enough to just run, and
-  # without it the plugin step below can do nothing. You still log in yourself.
+  # Claude Code itself. Anthropic's installer: user-scope, checksum-verified
+  # against a signed manifest, lands in ~/.local/bin, and refuses to run under
+  # sudo. Only when missing, so an existing install is never upgraded - and a
+  # running one is never replaced, because a running one is not missing.
   if ! have claude; then
     say "Installing Claude Code"
     curl -fsSL https://claude.ai/install.sh | bash || warn "The Claude Code installer failed."
@@ -279,28 +299,46 @@ backup_claude_dir() {
   have git || die "git is not on PATH, so $CLAUDE_DIR cannot be backed up before it is overwritten.
 Install git (or re-run without --skip-toolchain), or pass --skip-backup to overwrite with no undo path."
 
-  # `rev-parse --is-inside-work-tree` is also true when an *ancestor* is a repo,
-  # which is the normal case for dotfiles setups where $HOME itself is tracked.
-  # Reusing that repo would commit unrelated $HOME files and make the restore
-  # command below revert far more than ~/.claude. Only reuse a repo rooted here.
-  local toplevel
-  toplevel="$(git -C "$CLAUDE_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-  if [ "$toplevel" != "$CLAUDE_DIR" ]; then
+  # Only ever reuse a repo rooted *here*. `rev-parse --is-inside-work-tree` is
+  # also true when an ancestor is a repo, which is the normal case for dotfiles
+  # setups where $HOME itself is tracked; committing into that would sweep up
+  # unrelated $HOME files and make the restore command below revert far more
+  # than ~/.claude.
+  #
+  # Testing for .git here, rather than comparing `rev-parse --show-toplevel`
+  # against the path: git reports the *physical* path while `cd`+`pwd` reports
+  # the logical one, so a single symlink anywhere in between makes the two
+  # differ and an existing repo look brand new - at which point the branch below
+  # would rewrite someone's .gitignore. Not hypothetical on macOS, where /tmp
+  # and /var are symlinks into /private. A .git that is a file rather than a
+  # directory is a linked worktree or submodule: still a root, still not ours.
+  local entry
+  if [ -e "$CLAUDE_DIR/.git" ]; then
+    # Someone else's repo. Whatever it tracks and whatever its .gitignore says is
+    # their decision - they may well be relying on it to restore sessions and
+    # history. Commit what is about to be overwritten and change nothing else:
+    # no .gitignore edits, no untracking. Adding an ignore rule here would not
+    # untrack what is already in the repo, but it WOULD stop `git add` from
+    # picking up new files underneath, so tomorrow's sessions would silently
+    # stop being backed up while yesterday's stayed.
+    say "Using the existing repo in $CLAUDE_DIR as-is; its .gitignore is left alone."
+  else
     say "Initialising a backup repo in $CLAUDE_DIR"
     git -C "$CLAUDE_DIR" init -q
-  fi
 
-  # Never let the local backup repo track OAuth credentials, bulk state, or
-  # setup residue left behind by an interrupted run. .DS_Store is macOS litter.
-  local gitignore="$CLAUDE_DIR/.gitignore" entry
-  for entry in ".credentials.json" ".claude-setup-staging-*" ".claude-setup-backup-*" \
-               "projects/" "shell-snapshots/" "session-env/" "file-history/" \
-               "cache/" "plugins/" "paste-cache/" "history.jsonl" ".DS_Store"; do
-    grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
-    # A .gitignore entry does NOT untrack an already-tracked file, and an
-    # existing ~/.claude repo may well have .credentials.json in its index.
-    git -C "$CLAUDE_DIR" rm -r --cached --quiet --ignore-unmatch -- "$entry" >/dev/null 2>&1 || true
-  done
+    # Only ever written for a repo this script just created, where nothing is
+    # tracked yet and so nothing can be lost. It keeps OAuth credentials, our own
+    # residue from an interrupted run, bulk runtime state and .DS_Store litter
+    # out from the start. Bulk state is megabytes per commit and no use as an
+    # undo point.
+    local gitignore="$CLAUDE_DIR/.gitignore"
+    for entry in ".credentials.json" ".claude-setup-staging-*" ".claude-setup-backup-*" \
+                 "downloads/" "projects/" "shell-snapshots/" "session-env/" \
+                 "file-history/" "cache/" "plugins/" "paste-cache/" "backups/" \
+                 "history.jsonl" "stats-cache.json" ".DS_Store"; do
+      grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
+    done
+  fi
 
   git -C "$CLAUDE_DIR" config user.name  >/dev/null 2>&1 || git -C "$CLAUDE_DIR" config user.name  "Claude setup backup"
   git -C "$CLAUDE_DIR" config user.email >/dev/null 2>&1 || git -C "$CLAUDE_DIR" config user.email "claude-setup@localhost"
@@ -308,9 +346,13 @@ Install git (or re-run without --skip-toolchain), or pass --skip-backup to overw
   git -C "$CLAUDE_DIR" add --all
   git -C "$CLAUDE_DIR" commit --allow-empty -q -m "Backup before Claude setup replication"
 
-  if git -C "$CLAUDE_DIR" ls-files --error-unmatch .credentials.json >/dev/null 2>&1; then
-    warn "The backup repo in $CLAUDE_DIR is still tracking .credentials.json."
-    warn "Untrack it before sharing that repo: git -C $CLAUDE_DIR rm --cached .credentials.json"
+  # Reported, not acted on: this is your repo. `ls-files -- <path>` prints the
+  # path when tracked and nothing when not, and always exits 0 - unlike
+  # --error-unmatch, whose exit code is the answer and would linger in $?.
+  if [ -n "$(git -C "$CLAUDE_DIR" ls-files -- .credentials.json 2>/dev/null)" ]; then
+    warn "This repo tracks .credentials.json, which holds live OAuth tokens."
+    warn "Left as-is deliberately. To stop committing it, untrack it yourself:"
+    warn "  git -C $CLAUDE_DIR rm --cached .credentials.json"
   fi
   say "Snapshot committed - restore with: git -C $CLAUDE_DIR checkout HEAD -- ."
 }

@@ -14,8 +14,8 @@ userland, so no GNU coreutils are needed.
 - macOS with an admin account. Homebrew is installed if it is missing, and its
   installer will ask for your password.
 - `curl` and `tar`, both of which ship with macOS.
-- Nothing else. Unlike the Windows and WSL packages, this one installs the
-  `claude` CLI too — you still log in yourself.
+- Nothing else. Claude Code itself is installed if it's missing; you log in with
+  your own account.
 
 ## Run it
 
@@ -91,7 +91,7 @@ Same 16 files, same behaviour. The deltas:
 | Statusline | `statusline-command.ps1` | `statusline-command.sh` | `statusline-command.sh` |
 | `Bash(cd *)` / `Bash(pushd *)` deny-rules | present | absent | absent — they exist for Git Bash's unstatic cwd, which is a Windows problem |
 | Package manager | `winget` + the official Node MSI | `apt`/`dnf`/`pacman`/`zypper` | Homebrew |
-| Installs the `claude` CLI | no | no | **yes** |
+| .NET SDK | winget, LTS major resolved at run time | distro packages, newest LTS first | `dotnet-install.sh --channel LTS` |
 
 ## What the installer installs
 
@@ -105,16 +105,22 @@ Each is skipped if already on PATH:
 | `graphify` | `uv tool install graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
 | `git`, `jq`, `python`, `uv`, `node` | `brew install` | Backup step, JSON wrangling, hooks, graphify, the TypeScript server. |
 | `rustup` | `sh.rustup.rs` | Provides `cargo` (for `rtk`) and `rust-analyzer`. From rustup.rs rather than Homebrew so `rustup component add` behaves as it does on the other platforms. |
-| .NET SDK | `brew install --cask dotnet-sdk` | Needed for `csharp-ls`. Best-effort: the cask can want an interactive password, and `csharp-ls` is the only casualty if it doesn't land. Homebrew ships one cask tracking the current release rather than a cask per LTS, so the LTS-only version policy the other two platforms follow can't be expressed here. |
+| .NET SDK | `dotnet-install.sh --channel LTS` | Needed for `csharp-ls`. Microsoft's own script, and `LTS` is a first-class channel meaning "the most recent Long Term Support release" — so the version policy is named directly and needs no editing when .NET 11 ships. Installs under `$HOME/.dotnet` with no `sudo`. Best-effort; `csharp-ls` is the only casualty if it doesn't land. |
 | `typescript-language-server` | `npm i -g` | Behind the `typescript-lsp` plugin. |
 | `csharp-ls` | `dotnet tool install -g` | Behind the `csharp-lsp` plugin. |
 | `rust-analyzer` | `rustup component add` | Behind the `rust-analyzer-lsp` plugin. |
 
-`$HOME/.cargo/bin`, `$HOME/.local/bin` and `$HOME/.dotnet/tools` are added to
-`~/.zprofile` — and to `~/.zshrc`, `~/.bash_profile` and `~/.profile` if those
-exist. `~/.zprofile` is created if none of them do, since zsh has been the login
-shell since Catalina. Directories outside `$HOME` are never persisted; the
-Homebrew prefix is already handled by `brew shellenv`.
+`$HOME/.cargo/bin`, `$HOME/.local/bin`, `$HOME/.dotnet` and `$HOME/.dotnet/tools`
+are added to `~/.zprofile` — always, since zsh has been the login shell since
+Catalina, so it is written whether or not it already exists — and also to
+`~/.zshrc`, `~/.bash_profile` and `~/.profile` if those exist. Directories
+outside `$HOME` are never persisted; the Homebrew prefix is already handled by
+`brew shellenv`.
+
+`DOTNET_ROOT=$HOME/.dotnet` is exported and persisted the same way, but only
+when this script is the one that installed the SDK. `dotnet-install.sh` puts it
+somewhere macOS does not look by default, and a global tool's launcher can't
+find its runtime without that variable.
 
 ### ⚠️ The `rtk` name collision
 
@@ -146,8 +152,21 @@ probe fails.
 - **The backup repo is created in `~/.claude` itself**, never a parent — a
   dotfiles setup where `$HOME` is already a git repo won't get an unrelated
   commit.
-- **`.credentials.json` is gitignored *and* untracked** from the backup repo if
-  a previous setup had already committed it. `.DS_Store` is ignored too.
+- **An existing repo is never reconfigured.** If `~/.claude` is already a git
+  repo, the installer commits and nothing else: your `.gitignore` is not edited,
+  and nothing is untracked. It is your repo — what it captures is your call.
+  Adding an ignore rule would not untrack what is already there, but it *would*
+  stop `git add` from picking up new files, so tomorrow's sessions would
+  silently stop being backed up while yesterday's stayed. It does warn if the
+  repo tracks `.credentials.json`, since those are live OAuth tokens, but it
+  does not act — `git -C ~/.claude rm --cached .credentials.json` is yours to
+  run. That check is the presence of `.git` in the directory itself, so it still
+  holds when `~/.claude` is a symlink into a dotfiles checkout.
+- **A repo the installer creates gets a sensible `.gitignore`.** Credentials,
+  setup residue, bulk runtime state (`projects/`, `file-history/`,
+  `history.jsonl`, `plugins/`, the caches) and `.DS_Store` are excluded from the
+  start, so a fresh machine never begins committing megabytes of session data
+  that is no use as an undo point.
 
 ## Undo
 
@@ -169,5 +188,5 @@ part of it has been executed on macOS hardware — there is none to hand. What
 composed `CLAUDE.md`, the transactional swap and rollback, and the plugin
 matcher all come from the WSL installer unchanged and are covered by its test
 run. The macOS-specific parts — the Homebrew bootstrap, the `brew shellenv`
-persistence, the `dotnet-sdk` cask and the `claude` install — are unexercised.
+persistence, the .NET SDK script and the `claude` install — are unexercised.
 Expect to fix something on first run.

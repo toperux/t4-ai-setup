@@ -15,8 +15,8 @@ pacman and zypper are all handled), but only apt has been exercised.
 - **`python3`** — required, not optional. It renders `settings.json`, strips the
   graphify block and validates the result, and both hooks run under it. The
   installer stops early with a clear message if it is missing.
-- Claude Code already installed and logged in (`claude --version` works). The
-  installer configures it but does not install it.
+- Nothing else. Claude Code itself is installed if it's missing; you log in with
+  your own account.
 
 ## Run it
 
@@ -95,6 +95,7 @@ Each is skipped if already on PATH:
 | --- | --- | --- |
 | `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook routes every Bash tool call through `rtk hook claude`. From **git, not crates.io** — see the warning below. |
 | `graphify` | `uv tool install graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
+| `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` | Claude Code itself. Anthropic's own installer: user scope, checksum-verified, lands in `~/.local/bin`, and refuses to run under `sudo`. Only when missing — an existing install is never upgraded, and a running one is never replaced, because a running one isn't missing. |
 | `git`, `jq`, `curl`, `python3` | distro package manager | Backup step, JSON wrangling, hooks. |
 | `rustup` | `sh.rustup.rs` | Provides `cargo` (for `rtk`) and `rust-analyzer`. |
 | `uv` | `astral.sh/uv/install.sh` | Installs graphify. |
@@ -133,8 +134,32 @@ warning).
 - **The backup repo is created in `~/.claude` itself**, never a parent — a
   dotfiles setup where `$HOME` is already a git repo won't get an unrelated
   commit.
-- **`.credentials.json` is gitignored *and* untracked** from the backup repo if
-  a previous setup had already committed it.
+- **An existing repo is never reconfigured.** If `~/.claude` is already a git
+  repo, the installer commits and nothing else: your `.gitignore` is not edited,
+  and nothing is untracked. It is your repo — what it captures is your call.
+  That check is the presence of `.git` in the directory itself, so it still
+  holds when `~/.claude` is a symlink into a dotfiles checkout.
+- **A repo the installer creates gets a sensible `.gitignore`.** Credentials,
+  setup residue, and bulk runtime state (`projects/`, `file-history/`,
+  `history.jsonl`, `plugins/`, the caches) are excluded from the start, so a
+  fresh machine never starts committing megabytes of session data that is no
+  use as an undo point.
+
+### Why an existing repo is left alone
+
+Adding `projects/` to a `.gitignore` does not untrack the session files already
+in the repo, but it *does* stop `git add` from picking up new ones. Tomorrow's
+sessions would silently stop being backed up while yesterday's stayed — worse
+than either choice made outright, and it would quietly break anyone using this
+repo to restore sessions.
+
+The installer only warns about one thing: if the repo tracks
+`.credentials.json`, it says so, because those are live OAuth tokens. It does
+not act. To stop committing them:
+
+```bash
+git -C ~/.claude rm --cached .credentials.json
+```
 
 ## Undo
 

@@ -444,30 +444,57 @@ function Backup-CopilotDirectory {
                "-SkipBackup to overwrite with no undo path.")
     }
 
-    # Compare the repo root against the target: `--is-inside-work-tree` is true
-    # when merely NESTED in someone else's repo, which would commit the parent
-    # (potentially the whole home directory) instead of creating a repo here.
-    $gitRoot = Get-NativeText { & git -C $CopilotDirectory rev-parse --show-toplevel 2>$null }
-    $isGitRepository = $gitRoot -and [string]::Equals(
-        [IO.Path]::GetFullPath($gitRoot).TrimEnd("\"),
-        $targetPath.TrimEnd("\"),
-        [StringComparison]::OrdinalIgnoreCase)
-    if (-not $isGitRepository) {
-        Invoke-Git -Arguments @("init")
-    }
-
-    # Keep setup residue out of the backup repo if a run was interrupted mid-copy.
-    # (No credential entry here: unlike ~/.claude, ~/.copilot has no token file -
-    # config.json is JSONC user settings and should be backed up.)
-    $gitignore = Join-Path $CopilotDirectory ".gitignore"
-    $ignoreEntries = @(".copilot-setup-staging-*", ".copilot-setup-backup-*")
-    if (-not (Test-Path $gitignore)) {
-        Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")
+    # Look for .git in this directory specifically. `--is-inside-work-tree` would
+    # be true when merely NESTED in someone else's repo, which would commit the
+    # parent (potentially the whole home directory) instead of creating a repo
+    # here. Comparing `rev-parse --show-toplevel` against the target would fix
+    # that but introduce another: git reports the path with reparse points
+    # resolved, so a .copilot that is a junction or symlink into a dotfiles
+    # checkout reports its real location, the comparison fails, and an existing
+    # repo gets treated as a fresh one and reconfigured. Verified: git returned
+    # ...\winsym\real for a target of ...\winsym\link.
+    $isGitRepository = Test-Path -LiteralPath (Join-Path $CopilotDirectory ".git")
+    if ($isGitRepository) {
+        # Someone else's repo. Whatever it tracks and whatever its .gitignore says
+        # is their decision - they may well be relying on it to restore sessions.
+        # Commit what is about to be overwritten and change nothing else: no
+        # .gitignore edits, no untracking. Adding an ignore rule here would not
+        # untrack what is already in the repo, but it WOULD stop `git add` from
+        # picking up new files underneath, so tomorrow's sessions would silently
+        # stop being backed up while yesterday's stayed.
+        Write-Host "Using the existing repo in $CopilotDirectory as-is; its .gitignore is left alone."
     } else {
-        $existing = @(Get-Content $gitignore)
-        foreach ($entry in $ignoreEntries) {
-            if ($existing -notcontains $entry) {
-                Add-Content -Path $gitignore -Value $entry
+        Invoke-Git -Arguments @("init")
+
+        # Only ever written for a repo this script just created, where nothing is
+        # tracked yet and so nothing can be lost. It holds our own residue from an
+        # interrupted run, plus bulk runtime state: chat transcripts, the two
+        # SQLite databases and their write-ahead logs, session and IDE state,
+        # logs, and the websocket port and token of the running process.
+        # session-store.db alone is megabytes and its -wal changes on every
+        # interaction.
+        #
+        # Settings, instructions, hooks, skills, prompts and installed-plugins are
+        # NOT here: those are the config, and backing them up is the point. Nor is
+        # there a credential entry - unlike ~/.claude, ~/.copilot has no token
+        # file, and config.json is JSONC user settings worth keeping.
+        $gitignore = Join-Path $CopilotDirectory ".gitignore"
+        $ignoreEntries = @(
+            ".copilot-setup-staging-*", ".copilot-setup-backup-*",
+            "chats/", "jb/", "session-state/", "sidebar-sessions-state/",
+            "logs/", "ide/", "run/", "restart/", "media-cache/",
+            "data.db", "data.db-shm", "data.db-wal",
+            "session-store.db", "session-store.db-shm", "session-store.db-wal",
+            "command-history-state.json", "vscode.session.metadata.cache.json"
+        )
+        if (-not (Test-Path $gitignore)) {
+            Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")
+        } else {
+            $existing = @(Get-Content $gitignore)
+            foreach ($entry in $ignoreEntries) {
+                if ($existing -notcontains $entry) {
+                    Add-Content -Path $gitignore -Value $entry
+                }
             }
         }
     }
@@ -816,3 +843,9 @@ Write-Host "Setup complete. Restart the terminal, then run: copilot"
 if ($script:RestartRequired) {
     Write-Warning "Restart Windows to finish the Node.js installation."
 }
+
+# Every real failure above is a `throw`, which exits non-zero on its own. Without
+# this, the exit code is whatever $LASTEXITCODE happened to be left at by the
+# last native command - a warned-about plugin or a failing `rtk gain` probe would
+# make a successful install look like a failed one to a caller.
+exit 0

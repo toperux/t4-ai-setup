@@ -143,6 +143,23 @@ them):
 - **Node.js is checksum-verified** against the SHA256 nodejs.org publishes.
 - **The backup repo is created in `~/.copilot` itself**, never a parent. If your
   home directory happens to be a git repo, this won't commit into it.
+- **An existing repo is never reconfigured.** If `~/.copilot` is already a git
+  repo, the installer commits and nothing else: your `.gitignore` is not edited,
+  and nothing is untracked. It is your repo — what it captures is your call.
+  Adding an ignore rule would not untrack what is already there, but it *would*
+  stop `git add` from picking up new files, so tomorrow's sessions would
+  silently stop being backed up while yesterday's stayed. That check is the
+  presence of `.git` in the directory itself, so it still holds when `.copilot`
+  is a junction or symlink into a dotfiles checkout.
+- **A repo the installer creates gets a sensible `.gitignore`.** Setup residue
+  plus the bulk runtime state: `chats/`, `session-state/`, `jb/`, the logs, and
+  the two SQLite databases with their write-ahead logs. `session-store.db` alone
+  runs to megabytes and its `-wal` changes on every interaction.
+
+  Settings, instructions, hooks, skills, prompts and `installed-plugins/` are
+  never in that list: those are the config, and backing them up is the point.
+  There is no credential entry either — unlike `~/.claude`, `~/.copilot` has no
+  token file, and `config.json` is user settings worth keeping.
 
 ## Undo
 

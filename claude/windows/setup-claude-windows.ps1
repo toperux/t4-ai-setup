@@ -325,6 +325,38 @@ function Install-NodeJsLts {
     Update-SessionPath
 }
 
+function Install-ClaudeCode {
+    if (Get-Command claude -ErrorAction SilentlyContinue) { return }
+
+    # Anthropic's own installer: user scope, no elevation, and it verifies the
+    # binary's SHA256 against a signed manifest before running `claude install`
+    # to wire up the launcher. Only when missing, so an existing install is never
+    # upgraded - and a running one is never replaced, because a running one is
+    # not missing.
+    Write-Host "Installing Claude Code..."
+    $previousProgress = $ProgressPreference
+    $ProgressPreference = "SilentlyContinue"
+    $installer = Join-Path $env:TEMP "$PID-claude-install.ps1"
+    try {
+        Invoke-WebRequest "https://claude.ai/install.ps1" -OutFile $installer -UseBasicParsing
+        & $installer
+    } catch {
+        Write-Warning "Could not install Claude Code: $_"
+    } finally {
+        $ProgressPreference = $previousProgress
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    }
+
+    Add-UserPath (Join-Path $HOME ".local\bin")
+    Update-SessionPath
+    # Presence, not the exit code: install.ps1 only calls `exit` on failure, so a
+    # successful run leaves $LASTEXITCODE holding whatever came before it.
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        Write-Warning "Claude Code is still not on PATH, so the plugin step will be skipped."
+        Write-Warning "Install it yourself (irm https://claude.ai/install.ps1 | iex) and re-run."
+    }
+}
+
 # crates.io's `rtk` is a DIFFERENT tool - "Rust Type Kit" (reachingforthejack/rtk,
 # stuck at 0.1.0). The one this setup needs is rtk-ai/rtk, installed from git.
 # `rtk gain` is the discriminator: Rust Type Kit has no such subcommand.
@@ -351,6 +383,7 @@ function Install-Toolchain {
     Install-WingetPackage -Id "Rustlang.Rustup" -Command "rustup"
     Install-NodeJsLts
     Install-DotNetLts
+    Install-ClaudeCode
 
     $cargoBin = Join-Path $HOME ".cargo\bin"
     Add-UserPath $cargoBin
@@ -451,29 +484,48 @@ function Backup-ClaudeDirectory {
                "-SkipBackup to overwrite with no undo path.")
     }
 
-    # Compare the repo root against the target: `--is-inside-work-tree` is true
-    # when merely NESTED in someone else's repo, which would commit the parent
-    # (potentially the whole home directory) instead of creating a repo here.
-    $gitRoot = Get-NativeText { & git -C $ClaudeDirectory rev-parse --show-toplevel 2>$null }
-    $isGitRepository = $gitRoot -and [string]::Equals(
-        [IO.Path]::GetFullPath($gitRoot).TrimEnd("\"),
-        $targetPath.TrimEnd("\"),
-        [StringComparison]::OrdinalIgnoreCase)
-    if (-not $isGitRepository) {
-        Invoke-Git -Arguments @("init")
-    }
-
-    # Never let the local backup repo track OAuth credentials, or setup residue
-    # left behind if a previous run was interrupted mid-copy.
-    $gitignore = Join-Path $ClaudeDirectory ".gitignore"
-    $ignoreEntries = @(".credentials.json", ".claude-setup-staging-*", ".claude-setup-backup-*")
-    if (-not (Test-Path $gitignore)) {
-        Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")
+    # Look for .git in this directory specifically. `--is-inside-work-tree` would
+    # be true when merely NESTED in someone else's repo, which would commit the
+    # parent (potentially the whole home directory) instead of creating a repo
+    # here. Comparing `rev-parse --show-toplevel` against the target would fix
+    # that but introduce another: git reports the path with reparse points
+    # resolved, so a .claude that is a junction or symlink into a dotfiles
+    # checkout reports its real location, the comparison fails, and an existing
+    # repo gets treated as a fresh one and reconfigured. Verified: git returned
+    # ...\winsym\real for a target of ...\winsym\link.
+    $isGitRepository = Test-Path -LiteralPath (Join-Path $ClaudeDirectory ".git")
+    if ($isGitRepository) {
+        # Someone else's repo. Whatever it tracks and whatever its .gitignore says
+        # is their decision - they may well be relying on it to restore sessions
+        # and history. Commit what is about to be overwritten and change nothing
+        # else: no .gitignore edits, no untracking. Adding an ignore rule here
+        # would not untrack what is already in the repo, but it WOULD stop
+        # `git add` from picking up new files underneath, so tomorrow's sessions
+        # would silently stop being backed up while yesterday's stayed.
+        Write-Host "Using the existing repo in $ClaudeDirectory as-is; its .gitignore is left alone."
     } else {
-        $existing = @(Get-Content $gitignore)
-        foreach ($entry in $ignoreEntries) {
-            if ($existing -notcontains $entry) {
-                Add-Content -Path $gitignore -Value $entry
+        Invoke-Git -Arguments @("init")
+
+        # Only ever written for a repo this script just created, where nothing is
+        # tracked yet and so nothing can be lost. It keeps OAuth credentials, our
+        # own residue from an interrupted run, and bulk runtime state out from the
+        # start. The last of those is megabytes per commit and no use as an undo
+        # point.
+        $gitignore = Join-Path $ClaudeDirectory ".gitignore"
+        $ignoreEntries = @(
+            ".credentials.json", ".claude-setup-staging-*", ".claude-setup-backup-*",
+            "downloads/", "projects/", "shell-snapshots/", "session-env/",
+            "file-history/", "cache/", "plugins/", "paste-cache/", "backups/",
+            "history.jsonl", "stats-cache.json"
+        )
+        if (-not (Test-Path $gitignore)) {
+            Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")
+        } else {
+            $existing = @(Get-Content $gitignore)
+            foreach ($entry in $ignoreEntries) {
+                if ($existing -notcontains $entry) {
+                    Add-Content -Path $gitignore -Value $entry
+                }
             }
         }
     }
@@ -489,6 +541,17 @@ function Backup-ClaudeDirectory {
 
     Invoke-Git -Arguments @("add", "--all")
     Invoke-Git -Arguments @("commit", "--allow-empty", "-m", "Backup before Claude setup replication")
+
+    # Reported, not acted on: this is your repo. `ls-files -- <path>` prints the
+    # path when tracked and nothing when not, always exiting 0. Deliberately not
+    # `--error-unmatch`, whose exit code IS the answer: the not-tracked case
+    # would leave $LASTEXITCODE at 1 and a clean install would report failure to
+    # whatever invoked it.
+    if (Get-NativeText { & git -C $ClaudeDirectory ls-files -- .credentials.json }) {
+        Write-Warning "This repo tracks .credentials.json, which holds live OAuth tokens."
+        Write-Warning "Left as-is deliberately. To stop committing it, untrack it yourself:"
+        Write-Warning "  git -C $ClaudeDirectory rm --cached .credentials.json"
+    }
 }
 
 # Every file the package ships, as a map of relative path -> absolute source.
@@ -857,3 +920,9 @@ Write-Host "Log in with your own account - no credentials were copied."
 if ($script:RestartRequired) {
     Write-Warning "Restart Windows to finish the Node.js installation."
 }
+
+# Every real failure above is a `throw`, which exits non-zero on its own. Without
+# this, the exit code is whatever $LASTEXITCODE happened to be left at by the
+# last native command - a warned-about plugin or a failing `rtk gain` probe would
+# make a successful install look like a failed one to a caller.
+exit 0

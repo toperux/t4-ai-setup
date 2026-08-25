@@ -166,6 +166,16 @@ install_toolchain() {
   fi
   add_path "$HOME/.local/bin"
 
+  # Claude Code itself. Anthropic's installer: user-scope, checksum-verified
+  # against a signed manifest, lands in ~/.local/bin, and refuses to run under
+  # sudo. Only when missing, so an existing install is never upgraded - and a
+  # running one is never replaced, because a running one is not missing.
+  if ! have claude; then
+    say "Installing Claude Code"
+    curl -fsSL https://claude.ai/install.sh | bash || warn "The Claude Code installer failed."
+    add_path "$HOME/.local/bin"
+  fi
+
   # Node - backs the TypeScript language server. nvm-managed shells expose node
   # only as a shell function, so probe for nvm before falling back to the distro.
   if ! have node && [ ! -s "$HOME/.nvm/nvm.sh" ]; then
@@ -246,28 +256,44 @@ backup_claude_dir() {
   have git || die "git is not on PATH, so $CLAUDE_DIR cannot be backed up before it is overwritten.
 Install git (or re-run without --skip-toolchain), or pass --skip-backup to overwrite with no undo path."
 
-  # `rev-parse --is-inside-work-tree` is also true when an *ancestor* is a repo,
-  # which is the normal case for dotfiles setups where $HOME itself is tracked.
-  # Reusing that repo would commit unrelated $HOME files and make the restore
-  # command below revert far more than ~/.claude. Only reuse a repo rooted here.
-  local toplevel
-  toplevel="$(git -C "$CLAUDE_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-  if [ "$toplevel" != "$CLAUDE_DIR" ]; then
+  # Only ever reuse a repo rooted *here*. `rev-parse --is-inside-work-tree` is
+  # also true when an ancestor is a repo, which is the normal case for dotfiles
+  # setups where $HOME itself is tracked; committing into that would sweep up
+  # unrelated $HOME files and make the restore command below revert far more
+  # than ~/.claude.
+  #
+  # Testing for .git here, rather than comparing `rev-parse --show-toplevel`
+  # against the path: git reports the *physical* path while `cd`+`pwd` reports
+  # the logical one, so a single symlink anywhere in between makes the two
+  # differ and an existing repo look brand new - at which point the branch below
+  # would rewrite someone's .gitignore. A .git that is a file rather than a
+  # directory is a linked worktree or submodule: still a root, still not ours.
+  local entry
+  if [ -e "$CLAUDE_DIR/.git" ]; then
+    # Someone else's repo. Whatever it tracks and whatever its .gitignore says is
+    # their decision - they may well be relying on it to restore sessions and
+    # history. Commit what is about to be overwritten and change nothing else:
+    # no .gitignore edits, no untracking. Adding an ignore rule here would not
+    # untrack what is already in the repo, but it WOULD stop `git add` from
+    # picking up new files underneath, so tomorrow's sessions would silently
+    # stop being backed up while yesterday's stayed.
+    say "Using the existing repo in $CLAUDE_DIR as-is; its .gitignore is left alone."
+  else
     say "Initialising a backup repo in $CLAUDE_DIR"
     git -C "$CLAUDE_DIR" init -q
-  fi
 
-  # Never let the local backup repo track OAuth credentials, bulk state, or
-  # setup residue left behind by an interrupted run.
-  local gitignore="$CLAUDE_DIR/.gitignore" entry
-  for entry in ".credentials.json" ".claude-setup-staging-*" ".claude-setup-backup-*" \
-               "projects/" "shell-snapshots/" "session-env/" "file-history/" \
-               "cache/" "plugins/" "paste-cache/" "history.jsonl"; do
-    grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
-    # A .gitignore entry does NOT untrack an already-tracked file, and an
-    # existing ~/.claude repo may well have .credentials.json in its index.
-    git -C "$CLAUDE_DIR" rm -r --cached --quiet --ignore-unmatch -- "$entry" >/dev/null 2>&1 || true
-  done
+    # Only ever written for a repo this script just created, where nothing is
+    # tracked yet and so nothing can be lost. It keeps OAuth credentials, our own
+    # residue from an interrupted run, and bulk runtime state out from the start.
+    # The last of those is megabytes per commit and no use as an undo point.
+    local gitignore="$CLAUDE_DIR/.gitignore"
+    for entry in ".credentials.json" ".claude-setup-staging-*" ".claude-setup-backup-*" \
+                 "downloads/" "projects/" "shell-snapshots/" "session-env/" \
+                 "file-history/" "cache/" "plugins/" "paste-cache/" "backups/" \
+                 "history.jsonl" "stats-cache.json"; do
+      grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
+    done
+  fi
 
   git -C "$CLAUDE_DIR" config user.name  >/dev/null 2>&1 || git -C "$CLAUDE_DIR" config user.name  "Claude setup backup"
   git -C "$CLAUDE_DIR" config user.email >/dev/null 2>&1 || git -C "$CLAUDE_DIR" config user.email "claude-setup@localhost"
@@ -275,9 +301,13 @@ Install git (or re-run without --skip-toolchain), or pass --skip-backup to overw
   git -C "$CLAUDE_DIR" add --all
   git -C "$CLAUDE_DIR" commit --allow-empty -q -m "Backup before Claude setup replication"
 
-  if git -C "$CLAUDE_DIR" ls-files --error-unmatch .credentials.json >/dev/null 2>&1; then
-    warn "The backup repo in $CLAUDE_DIR is still tracking .credentials.json."
-    warn "Untrack it before sharing that repo: git -C $CLAUDE_DIR rm --cached .credentials.json"
+  # Reported, not acted on: this is your repo. `ls-files -- <path>` prints the
+  # path when tracked and nothing when not, and always exits 0 - unlike
+  # --error-unmatch, whose exit code is the answer and would linger in $?.
+  if [ -n "$(git -C "$CLAUDE_DIR" ls-files -- .credentials.json 2>/dev/null)" ]; then
+    warn "This repo tracks .credentials.json, which holds live OAuth tokens."
+    warn "Left as-is deliberately. To stop committing it, untrack it yourself:"
+    warn "  git -C $CLAUDE_DIR rm --cached .credentials.json"
   fi
   say "Snapshot committed - restore with: git -C $CLAUDE_DIR checkout HEAD -- ."
 }
@@ -535,7 +565,7 @@ install_graphify_skill
 
 if [ "$SKIP_TOOLCHAIN" -eq 0 ]; then
   missing=""
-  for c in git python3 uv graphify jq rustup rtk node dotnet csharp-ls rust-analyzer; do
+  for c in git python3 uv graphify jq rustup rtk node dotnet csharp-ls rust-analyzer claude; do
     have "$c" || missing="$missing $c"
   done
   if [ -n "$missing" ]; then

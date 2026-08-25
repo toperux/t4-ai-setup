@@ -47,31 +47,30 @@ All are idempotent — safe to re-run, and anything already installed is skipped
 
 ### Prerequisites
 
+**The CLI itself is installed for you.** Whichever installer you run puts the
+`claude` or `copilot` CLI on your machine if it isn't there already, using that
+tool's own official installer. Nothing already installed is upgraded, and you
+log in with your own account either way.
+
 **Windows:**
 
 - Windows 11 with `winget` available.
-- For Claude Code: the `claude` CLI already installed and logged in — the
-  installer configures it but does not install it. (The Copilot installer does
-  install the `copilot` CLI if it's missing; you still log in yourself.)
 - **An elevated PowerShell if Node.js is not yet installed** — the official
   Node.js MSI cannot self-elevate. If you already have `node`, a normal prompt
-  is fine.
+  is fine. Nothing else here needs elevation.
 
 **WSL:**
 
 - `sudo` rights, plus `curl` and `tar`.
 - **`python3` is required, not optional** — it renders `settings.json` and both
   hooks run under it. The installer stops early if it is missing.
-- The `claude` CLI already installed and logged in.
 
 **macOS:**
 
 - An admin account. Homebrew is installed if missing and will ask for your
   password; `curl` and `tar` already ship with the OS.
-- Nothing else — this is the one installer that **does** install the `claude`
-  CLI for you. You still log in yourself.
 - ⚠️ **Untested on macOS hardware.** The platform-neutral half is covered by the
-  WSL test run; the Homebrew, `dotnet-sdk` cask and `claude` steps are not. See
+  WSL test run; the Homebrew, .NET and `claude` steps are not. See
   [`claude/macos/README.md`](claude/macos/README.md).
 
 ### Passing flags
@@ -121,13 +120,13 @@ apt/dnf/pacman/zypper plus `rustup` and `uv` on WSL, Homebrew on macOS.
 | --- | --- | :-: | :-: |
 | `rtk` | **Required.** A hook routes every shell command through `rtk hook` — a token-optimizing CLI proxy that claims 60–90% savings on dev operations. Installed **from git, not crates.io**; the crates.io `rtk` is an unrelated project. | ✅ | ✅ |
 | `graphify` | Backs the graphify skill (Claude) and the two graphify hooks (Copilot). The PyPI package is spelled `graphifyy`. | ✅ | ✅ |
-| The CLI itself | The Copilot installer installs `copilot`. The Claude installer installs `claude` **on macOS only** — on Windows and WSL, bring your own, already logged in. Either way you log in yourself. | macOS | ✅ |
+| The CLI itself | `claude` or `copilot`, from that tool's own official installer — user-scope, checksum-verified, no elevation. Only when missing, so an existing install is never upgraded and a running one is never replaced. You still log in yourself. | ✅ | ✅ |
 | Homebrew | macOS only, and everything else depends on it. `brew shellenv` is persisted to your profile, which Homebrew's own installer only prints as an instruction. | macOS | — |
 | `git` | The pre-write config backup — and, for Claude, the statusline's branch segment. | ✅ | ✅ |
 | Python | Runs the hooks — two for Claude, five for Copilot. Windows installs 3.14, macOS installs Homebrew's; **on WSL `python3` must already exist** and the installer stops early if it doesn't. | ✅ | ✅ |
 | `jq` | General JSON wrangling. On WSL, `curl` too. | ✅ | ✅ |
 | Node.js LTS | Only to provide `typescript-language-server`. | ✅ | ✅ |
-| .NET SDK (LTS) | Only to provide `csharp-ls`. The LTS major is resolved at run time — except on macOS, where Homebrew ships a single `dotnet-sdk` cask tracking the current release. | ✅ | ✅ |
+| .NET SDK (LTS) | Only to provide `csharp-ls`. The LTS major is resolved at run time on Windows and WSL; macOS uses Microsoft's `dotnet-install.sh --channel LTS`, which names the policy directly. | ✅ | ✅ |
 | `rustup` | Provides `cargo` (which builds `rtk`) and `rust-analyzer`. | ✅ | ✅ |
 | `typescript-language-server`, `csharp-ls`, `rust-analyzer` | The three language servers the LSP plugins and `lsp-config.json` drive. | ✅ | ✅ |
 
