@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "matcher": "bash|powershell",
+        "powershell": "rtk hook copilot",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}

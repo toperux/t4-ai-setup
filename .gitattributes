@@ -1,0 +1,6 @@
+# This repository distributes config files verbatim. Line-ending normalisation
+# would change the bytes that land in ~/.claude and ~/.copilot, and the sources
+# are genuinely mixed: CLAUDE.md is LF, copilot-instructions.md is CRLF. It
+# would also rewrite the planned WSL/macOS .sh scripts to CRLF and break their
+# shebangs.
+* -text

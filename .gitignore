@@ -1,0 +1,2 @@
+# Packaged zips would drift from the repo they were built from.
+*.zip

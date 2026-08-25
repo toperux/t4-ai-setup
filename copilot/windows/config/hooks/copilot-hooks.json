@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "matcher": "Read|Edit|Write",
+        "powershell": "python \"$env:USERPROFILE\\.copilot\\hooks\\check_sensitive_files.py\"",
+        "timeoutSec": 5
+      },
+      {
+        "type": "command",
+        "matcher": "Bash",
+        "powershell": "python \"$env:USERPROFILE\\.copilot\\hooks\\command_policy.py\"",
+        "timeoutSec": 5
+      },
+      {
+        "type": "command",
+        "matcher": "Bash",
+        "powershell": "python \"$env:USERPROFILE\\.copilot\\hooks\\worktree_guard.py\"",
+        "timeoutSec": 5
+      },
+      {
+        "type": "command",
+        "matcher": "Bash|Grep|Glob",
+        "powershell": "python \"$env:USERPROFILE\\.copilot\\hooks\\graphify_hint.py\"",
+        "timeoutSec": 5
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "matcher": "Edit|Write",
+        "powershell": "python \"$env:USERPROFILE\\.copilot\\hooks\\graphify_update_notice.py\"",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+# bash on Windows
+Never put `cd` in a compound command that also writes — Git Bash makes the final cwd unstatic, so relative write targets can't be checked and auto-approval is refused. Use the tool's own directory flag (`git -C`, `npm --prefix`, `make -C`, `tar -C`, `dotnet build <abs>.sln`), or keep the `cd` and make every write target absolute. Create files with the Write tool, not `> file`. Cwd does not persist between Bash calls, so a standalone `cd` is not a workaround.
