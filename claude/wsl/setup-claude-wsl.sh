@@ -159,6 +159,19 @@ install_toolchain() {
   fi
   add_path "$HOME/.cargo/bin"
 
+  # `have cargo` above only proves rustup's proxy shim is on PATH: rustup
+  # creates cargo, rustc and rust-analyzer proxies from a fixed list whether or
+  # not a toolchain is installed. rustup.rs -y does leave a default, but a
+  # rustup that was already on the machine may not have one, and the shim then
+  # fails with "could not choose a version of cargo to run ... no default is
+  # configured" - which is what killed the Windows run this mirrors.
+  # `show active-toolchain` exits non-zero in exactly that state, and installing
+  # stable also makes it the default when there is none.
+  if have rustup && ! rustup show active-toolchain >/dev/null 2>&1; then
+    say "Installing the Rust stable toolchain"
+    rustup toolchain install stable || warn "Rust stable toolchain install failed."
+  fi
+
   # uv - backs graphify.
   if ! have uv; then
     say "Installing uv"
@@ -240,7 +253,10 @@ install_toolchain() {
     say "Installing C# language server"
     dotnet tool install --global csharp-ls || warn "csharp-ls install failed."
   fi
-  if ! have rust-analyzer && have rustup; then
+  # Run it rather than look for it: rust-analyzer is one of the proxies rustup
+  # always creates, so `have rust-analyzer` is true even when the component is
+  # missing and the shim only exits 1 with "Unknown binary".
+  if have rustup && ! rust-analyzer --version >/dev/null 2>&1; then
     say "Installing rust-analyzer"
     rustup component add rust-analyzer || warn "rust-analyzer install failed."
   fi

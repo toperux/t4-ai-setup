@@ -354,13 +354,25 @@ function Install-Toolchain {
     Add-UserPath (Join-Path $HOME ".dotnet\tools")
     Update-SessionPath
 
-    # rustup on its own may leave no toolchain, so cargo/rustc would be missing.
-    if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
-        Invoke-Native { & rustup toolchain install stable }
+    # rustup installs proxy shims - rustc.exe, cargo.exe, rust-analyzer.exe and
+    # the rest of a fixed list - into ~\.cargo\bin whether or not a toolchain is
+    # present, so `Get-Command rustc` only proves the shim is on disk. winget's
+    # Rustlang.Rustup leaves exactly that state: shims, no toolchain. The guard
+    # then passed, this step was skipped, and `cargo install` died with "rustup
+    # could not choose a version of cargo to run ... no default is configured".
+    # Ask rustup instead - `show active-toolchain` exits non-zero when there is
+    # no default (verified: 1 with an empty RUSTUP_HOME, 0 once one exists).
+    if (Get-Command rustup -ErrorAction SilentlyContinue) {
+        $null = Get-NativeText { & rustup show active-toolchain 2>$null }
         if ($LASTEXITCODE -ne 0) {
-            throw "Rust stable toolchain installation failed."
+            # Installing stable also makes it the default when there is none,
+            # so this covers both "no toolchain" and "toolchain, no default".
+            Invoke-Native { & rustup toolchain install stable }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Rust stable toolchain installation failed."
+            }
+            Update-SessionPath
         }
-        Update-SessionPath
     }
 
     # rtk: a hook rewrites every shell command through it. Must be rtk-ai/rtk -
@@ -415,7 +427,18 @@ function Install-Toolchain {
         Update-SessionPath
     }
 
-    if (-not (Get-Command rust-analyzer -ErrorAction SilentlyContinue)) {
+    # The same shim trap as the toolchain check: rust-analyzer.exe is one of the
+    # proxies rustup always creates, so a presence check succeeds even when the
+    # component is not installed, the add is skipped, and the plugin gets a shim
+    # that exits 1 with "Unknown binary 'rust-analyzer.exe' in official
+    # toolchain". Run it instead - that also correctly skips a standalone
+    # rust-analyzer someone installed by another route.
+    $rustAnalyzerWorks = $false
+    if (Get-Command rust-analyzer -ErrorAction SilentlyContinue) {
+        $null = Get-NativeText { & rust-analyzer --version 2>$null }
+        $rustAnalyzerWorks = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $rustAnalyzerWorks) {
         Invoke-Native { & rustup component add rust-analyzer }
         if ($LASTEXITCODE -ne 0) {
             throw "Rust Analyzer installation failed."
