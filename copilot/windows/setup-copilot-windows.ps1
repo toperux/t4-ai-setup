@@ -8,14 +8,23 @@ Installs the user-level command-line setup and copies bundled Copilot configurat
 .EXAMPLE
 .\setup-copilot-windows.ps1 -SkipToolchain -SkipPlugins
 
+.EXAMPLE
+.\setup-copilot-windows.ps1 -WithRust
+
 .NOTES
+Rust is opt-in. By default no Rust toolchain is installed at all: rtk comes from
+winget as a prebuilt binary, and rust-analyzer and the rust LSP entry are
+skipped, so nothing here downloads from static.rust-lang.org. Pass -WithRust for
+Rust support.
+
 Version policy - nothing already installed is upgraded; these apply only when a
 command is missing.
 
   Tracks latest automatically:
-    git, uv, jq, Rust (rustup stable), graphify (PyPI 'graphifyy'),
-    typescript-language-server, csharp-ls, copilot, ponytail, and rtk (git HEAD
-    of rtk-ai/rtk - NOT the unrelated crates.io crate of the same name).
+    git, uv, jq, graphify (PyPI 'graphifyy'), typescript-language-server,
+    csharp-ls, copilot, ponytail, rtk (winget 'rtk-ai.rtk', which serves
+    rtk-ai/rtk's own release binary - NOT the unrelated crates.io crate of the
+    same name), and with -WithRust, Rust (rustup stable).
 
   Resolved at run time:
     Node.js - newest LTS with an MSI for this architecture, SHA256-verified.
@@ -40,7 +49,15 @@ param(
 
     [switch]$SkipPlugins,
 
-    [switch]$SkipBackup
+    [switch]$SkipBackup,
+
+    # Opt in to Rust. Off by default: nothing in this setup needs a Rust
+    # toolchain any more (rtk comes from winget as a prebuilt binary), and the
+    # ~200 MB of downloads from static.rust-lang.org that rustup pulls have been
+    # blocked outright by corporate filters reporting them as a trojan. Passing
+    # this adds rustup + the stable toolchain and the rust-analyzer component,
+    # and keeps the rust server in lsp-config.json.
+    [switch]$WithRust
 )
 
 $ErrorActionPreference = "Stop"
@@ -350,6 +367,35 @@ function Test-RtkIsTokenKiller {
     return ($LASTEXITCODE -eq 0)
 }
 
+# Resolve a command the way a NEW process will: Machine PATH first, then User.
+#
+# Test-RtkIsTokenKiller only proves the rtk that wins in THIS session works, and
+# the two orders are not the same - Add-UserPath prepends to the session PATH but
+# appends to the persisted one. So a machine with the wrong rtk in ~\.cargoin
+# (index 0 of the User PATH on the machine this was found on, against index 18
+# for WinGet\Links) passes the in-session check and still breaks the shell hook
+# in the terminal the user actually opens next. winget cannot remove that copy
+# the way `cargo install --force` used to overwrite it, so this has to be
+# checked rather than assumed.
+function Get-PersistedCommandPath {
+    param([Parameter(Mandatory)][string]$Executable)
+
+    foreach ($scope in "Machine", "User") {
+        foreach ($directory in ([Environment]::GetEnvironmentVariable("Path", $scope) -split ";")) {
+            if (-not $directory) { continue }
+            # PATH entries can be quoted or contain characters Join-Path rejects;
+            # a bad entry should be skipped, not abort the run.
+            try {
+                $candidate = Join-Path $directory.Trim('"') $Executable
+            } catch {
+                continue
+            }
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+    }
+    return $null
+}
+
 function Install-Toolchain {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "winget is required to install the user-level tools."
@@ -362,57 +408,70 @@ function Install-Toolchain {
     Install-Python
     Install-WingetPackage -Id "astral-sh.uv" -Command "uv"
     Install-WingetPackage -Id "jqlang.jq" -Command "jq"
-    Install-WingetPackage -Id "Rustlang.Rustup" -Command "rustup"
+    if ($WithRust) {
+        Install-WingetPackage -Id "Rustlang.Rustup" -Command "rustup"
+    }
     Install-WingetPackage -Id "GitHub.Copilot" -Command "copilot"
     Install-NodeJsLts
     Install-DotNetLts
 
-    $cargoBin = Join-Path $HOME ".cargo\bin"
-    Add-UserPath $cargoBin
+    if ($WithRust) {
+        Add-UserPath (Join-Path $HOME ".cargo\bin")
+    }
     Add-UserPath (Join-Path $HOME ".local\bin")
     Add-UserPath (Join-Path $env:APPDATA "npm")
     Add-UserPath (Join-Path $HOME ".dotnet\tools")
     Update-SessionPath
 
-    # rustup installs proxy shims - rustc.exe, cargo.exe, rust-analyzer.exe and
-    # the rest of a fixed list - into ~\.cargo\bin whether or not a toolchain is
-    # present, so `Get-Command rustc` only proves the shim is on disk. winget's
-    # Rustlang.Rustup leaves exactly that state: shims, no toolchain. The guard
-    # then passed, this step was skipped, and `cargo install` died with "rustup
-    # could not choose a version of cargo to run ... no default is configured".
-    # Ask rustup instead - `show active-toolchain` exits non-zero when there is
-    # no default (verified: 1 with an empty RUSTUP_HOME, 0 once one exists).
-    if (Get-Command rustup -ErrorAction SilentlyContinue) {
-        $null = Get-NativeText { & rustup show active-toolchain 2>$null }
-        if ($LASTEXITCODE -ne 0) {
-            # Installing stable also makes it the default when there is none,
-            # so this covers both "no toolchain" and "toolchain, no default".
-            Invoke-Native { & rustup toolchain install stable }
-            if ($LASTEXITCODE -ne 0) {
-                throw "Rust stable toolchain installation failed."
-            }
-            Update-SessionPath
-        }
-    }
-
     # rtk: a hook rewrites every shell command through it. Must be rtk-ai/rtk -
     # merely having *an* `rtk` on PATH is not enough.
+    #
+    # From winget, not `cargo install --git`. It is the same artifact - the
+    # rtk-ai.rtk manifest is a portable zip pointing at rtk-ai/rtk's own release
+    # asset, pinned by SHA256 - so the "must not be the crates.io crate of the
+    # same name" rule is satisfied without a Rust toolchain, a source build, or
+    # a 70 MB download from static.rust-lang.org that corporate filters have
+    # been seen to block as a trojan. winget drops a shim in WinGet\Links, which
+    # is already on PATH from above.
+    #
+    # -SkipPresenceCheck: an `rtk` on PATH may be the wrong one, which is the
+    # whole point of Test-RtkIsTokenKiller, so presence must not stand in for it.
     if (-not (Test-RtkIsTokenKiller)) {
-        $cargo = Join-Path $cargoBin "cargo.exe"
-        if (-not (Test-Path $cargo)) {
-            throw "cargo not found at $cargo - the Rust toolchain did not finish installing."
-        }
         if (Get-Command rtk -ErrorAction SilentlyContinue) {
             Write-Warning "An 'rtk' is on PATH but it is not rtk-ai/rtk (most likely Rust Type Kit"
-            Write-Warning "from crates.io, which shares the name). Replacing it."
+            Write-Warning "from crates.io, which shares the name). winget installs its own copy"
+            Write-Warning "alongside it - unlike the old 'cargo install --force', it cannot remove"
+            Write-Warning "that one. If the wrong copy wins on PATH, the check at the end says so."
         }
-        Invoke-Native { & $cargo install --git https://github.com/rtk-ai/rtk.git rtk --locked --force }
-        if ($LASTEXITCODE -ne 0) {
-            throw "rtk installation failed."
-        }
+        Install-WingetPackage -Id "rtk-ai.rtk" -Command "rtk" -SkipPresenceCheck
         Update-SessionPath
         if (-not (Test-RtkIsTokenKiller)) {
             throw "rtk installed but 'rtk gain' still fails - the wrong rtk is winning on PATH."
+        }
+    }
+
+    if ($WithRust) {
+        # rustup installs proxy shims - rustc.exe, cargo.exe, rust-analyzer.exe
+        # and the rest of a fixed list - into ~\.cargo\bin whether or not a
+        # toolchain is present, so `Get-Command rustc` only proves the shim is on
+        # disk. winget's Rustlang.Rustup leaves exactly that state: shims, no
+        # toolchain, and `cargo` then dies with "rustup could not choose a
+        # version of cargo to run ... no default is configured". Ask rustup
+        # instead - `show active-toolchain` exits non-zero when there is no
+        # default (verified: 1 with an empty RUSTUP_HOME, 0 once one exists).
+        if (Get-Command rustup -ErrorAction SilentlyContinue) {
+            $null = Get-NativeText { & rustup show active-toolchain 2>$null }
+            if ($LASTEXITCODE -ne 0) {
+                # Installing stable also makes it the default when there is none,
+                # so this covers both "no toolchain" and "toolchain, no default".
+                Invoke-Native { & rustup toolchain install stable }
+                if ($LASTEXITCODE -ne 0) {
+                    throw ("Rust stable toolchain installation failed. If the download was blocked " +
+                           "(corporate filters have flagged rust-lang.org downloads as malware), " +
+                           "drop -WithRust: nothing else here needs Rust.")
+                }
+                Update-SessionPath
+            }
         }
     }
 
@@ -447,23 +506,25 @@ function Install-Toolchain {
         Update-SessionPath
     }
 
-    # The same shim trap as the toolchain check: rust-analyzer.exe is one of the
-    # proxies rustup always creates, so a presence check succeeds even when the
-    # component is not installed, the add is skipped, and the plugin gets a shim
-    # that exits 1 with "Unknown binary 'rust-analyzer.exe' in official
-    # toolchain". Run it instead - that also correctly skips a standalone
-    # rust-analyzer someone installed by another route.
-    $rustAnalyzerWorks = $false
-    if (Get-Command rust-analyzer -ErrorAction SilentlyContinue) {
-        $null = Get-NativeText { & rust-analyzer --version 2>$null }
-        $rustAnalyzerWorks = ($LASTEXITCODE -eq 0)
-    }
-    if (-not $rustAnalyzerWorks) {
-        Invoke-Native { & rustup component add rust-analyzer }
-        if ($LASTEXITCODE -ne 0) {
-            throw "Rust Analyzer installation failed."
+    if ($WithRust) {
+        # The same shim trap as the toolchain check: rust-analyzer.exe is one of
+        # the proxies rustup always creates, so a presence check succeeds even
+        # when the component is not installed, the add is skipped, and the LSP
+        # gets a shim that exits 1 with "Unknown binary 'rust-analyzer.exe' in
+        # official toolchain". Run it instead - that also correctly skips a
+        # standalone rust-analyzer someone installed by another route.
+        $rustAnalyzerWorks = $false
+        if (Get-Command rust-analyzer -ErrorAction SilentlyContinue) {
+            $null = Get-NativeText { & rust-analyzer --version 2>$null }
+            $rustAnalyzerWorks = ($LASTEXITCODE -eq 0)
         }
-        Update-SessionPath
+        if (-not $rustAnalyzerWorks) {
+            Invoke-Native { & rustup component add rust-analyzer }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Rust Analyzer installation failed."
+            }
+            Update-SessionPath
+        }
     }
 }
 
@@ -577,6 +638,47 @@ function Get-InstalledFiles {
     }) + $ComposedFile.Output)
 }
 
+# Drop the rust server from lsp-config.json for a default (no-Rust) install, so
+# no LSP entry points at a rust-analyzer that was never installed.
+#
+# Text surgery, not ConvertFrom-Json | ConvertTo-Json: a round trip through
+# PowerShell 5.1's JSON writer reindents the whole file and would also rewrite
+# its CRLF line endings, a large diff for a one-key change. The entry is
+# currently last in lspServers, so the comma that has to go with it is the one
+# BEFORE it; both positions are handled rather than depending on that ordering.
+# The inner pattern allows exactly one level of nesting, which is the shape of
+# these entries (a "fileExtensions" object). Whatever the regex does, the result
+# is parsed and the server sets compared, so a mangled file fails here.
+function Remove-RustLspServer {
+    param([Parameter(Mandatory)][string]$Json)
+
+    # Already absent is the wanted end state, not an error: a custom
+    # -SharedSource may ship an lsp-config.json that never had a rust server.
+    $before = @(($Json | ConvertFrom-Json).lspServers.PSObject.Properties.Name)
+    if ($before -notcontains "rust") {
+        return $Json
+    }
+
+    $body = '\{(?:[^{}]|\{[^{}]*\})*\}'
+    $updated = [regex]::Replace($Json, ',\s*"rust"\s*:\s*' + $body, "")
+    if ($updated -eq $Json) {
+        $updated = [regex]::Replace($Json, '"rust"\s*:\s*' + $body + '\s*,\s*', "")
+    }
+    # It parsed as present but survived both patterns, so the patterns are wrong.
+    if ($updated -eq $Json) {
+        throw "Could not remove the rust server from lsp-config.json for a no-Rust install."
+    }
+
+    $after = @(($updated | ConvertFrom-Json).lspServers.PSObject.Properties.Name)
+    $removed = @($before | Where-Object { $after -notcontains $_ })
+    $added   = @($after  | Where-Object { $before -notcontains $_ })
+    if ($removed.Count -ne 1 -or $removed[0] -ne "rust" -or $added.Count -ne 0) {
+        throw "Removing the rust server from lsp-config.json changed the server set in some other way."
+    }
+
+    return $updated
+}
+
 function Copy-CopilotConfiguration {
     # Install exactly the files the package ships, at their own relative paths.
     #
@@ -626,6 +728,16 @@ function Copy-CopilotConfiguration {
                 New-Item -ItemType Directory -Path $stagedParent -Force | Out-Null
             }
             Copy-Item -LiteralPath $map[$relativePath] -Destination $staged -Force
+        }
+
+        # Post-process the staged copy rather than special-casing it in the loop
+        # above, so the plain copy stays the one path every shipped file takes.
+        if (-not $WithRust) {
+            $lspConfig = Join-Path $stagingRoot "lsp-config.json"
+            if (Test-Path $lspConfig) {
+                Write-TextFile -Path $lspConfig `
+                               -Content (Remove-RustLspServer ([IO.File]::ReadAllText($lspConfig)))
+            }
         }
 
         foreach ($relativePath in (@($ComposedFile.Output) + $shipped)) {
@@ -844,8 +956,12 @@ if (-not $SkipPlugins) {
 }
 
 if (-not $SkipToolchain) {
-    foreach ($command in "git", "pymanager", "python", "uv", "graphify", "jq",
-                         "rustup", "rustc", "cargo", "copilot", "dotnet", "csharp-ls", "rust-analyzer") {
+    $required = @("git", "pymanager", "python", "uv", "graphify", "jq",
+                  "copilot", "dotnet", "csharp-ls")
+    if ($WithRust) {
+        $required += @("rustup", "rustc", "cargo", "rust-analyzer")
+    }
+    foreach ($command in $required) {
         if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
             throw "$command is not available on PATH after setup."
         }
@@ -855,7 +971,20 @@ if (-not $SkipToolchain) {
     if (-not (Test-RtkIsTokenKiller)) {
         throw ("rtk is not the expected tool ('rtk gain' fails). The setup's shell hook will " +
                "break. Install it with: " +
-               "cargo install --git https://github.com/rtk-ai/rtk.git rtk --locked --force")
+               "winget install --id rtk-ai.rtk --exact --source winget")
+    }
+    # ...and the same question for the terminal the user opens next, which
+    # resolves PATH in a different order than this session does.
+    $persistedRtk = Get-PersistedCommandPath "rtk.exe"
+    if (-not $persistedRtk) {
+        throw "rtk works here but is on no persisted PATH entry, so a new terminal will not find it."
+    }
+    Invoke-Native { & $persistedRtk gain *> $null }
+    if ($LASTEXITCODE -ne 0) {
+        throw ("$persistedRtk is what a new terminal will run as 'rtk', and it is not rtk-ai/rtk " +
+               "('rtk gain' fails there) - most likely the crates.io crate of the same name. It " +
+               "shadows the copy just installed, and winget cannot remove it. Delete that file " +
+               "(or 'cargo uninstall rtk') and re-run.")
     }
     # Node may have been skipped for lack of elevation; that only degrades the
     # TypeScript language server, so warn rather than fail the whole run.

@@ -34,6 +34,7 @@ Flags (to pass these through the one-liner, see the
 
 | Flag | Effect |
 | --- | --- |
+| `-WithRust` | Install Rust: rustup + the stable toolchain, `rust-analyzer`, and the `rust-analyzer-lsp` plugin. Off by default — see [Rust is opt-in](#rust-is-opt-in). |
 | `-SkipToolchain` | Only copy the config; install no tools. |
 | `-SkipPlugins` | Skip the `claude plugin` installs. |
 | `-SkipBackup` | Don't git-commit `~/.claude` first. Overwrites with no undo path. Only needed if you're running `-SkipToolchain` on a machine without git. |
@@ -51,7 +52,7 @@ merges them, with the overlay winning on a collision.
 | File | What it does |
 | --- | --- |
 | `shared/CLAUDE.core.md` + `windows/config/CLAUDE.append.md` | Global instructions loaded into every session: think before coding, simplicity first, surgical changes, goal-driven execution. Plus a terse-reporting preference and a Windows/Git-Bash rule about never putting `cd` in a compound command that also writes. **Composed into `~/.claude/CLAUDE.md` at install time** — see below. |
-| `windows/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, telemetry off, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`, `cd` and `pushd`. Wires up the hooks and statusline below, and enables the four plugins. |
+| `windows/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, telemetry off, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`, `cd` and `pushd`. Wires up the hooks and statusline below, and enables the plugins — four with `-WithRust`, otherwise three, since `rust-analyzer-lsp` is removed for a no-Rust install. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse hook. Hard-blocks Read/Edit/Write on secret-ish files (exits 2), independent of the deny-rules — belt and braces. |
 | `shared/hooks/worktree_guard.py` | PreToolUse hook on Bash. Denies `git worktree add` anywhere outside `<cwd>/.claude/worktrees/` or `%TEMP%/claude/`, so worktrees stop landing in the workspace root or `C:\`. |
 | `windows/config/statusline-command.ps1` | Statusline: model name, context-usage bar, 5-hour and 7-day rate-limit bars, logged-in account email, current git branch. |
@@ -78,26 +79,48 @@ Command-line tools (each skipped if already on PATH):
 
 | Tool | Via | Why |
 | --- | --- | --- |
-| `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook rewrites every Bash tool call through `rtk hook claude`. Without it on PATH, every Bash call fails. Note it comes from **git, not crates.io** — see the warning below. |
+| `rtk` | winget `rtk-ai.rtk` | **Required.** A hook rewrites every Bash tool call through `rtk hook claude`. Without it on PATH, every Bash call fails. A prebuilt binary — no Rust toolchain needed. Not the crates.io crate of the same name; see the warning below. |
 | `graphify` | `uv tool install graphifyy` | Backs the bundled graphify skill and its two hooks. The PyPI package really is spelled with two y's. |
 | `claude` | `https://claude.ai/install.ps1` | Claude Code itself. Anthropic's own installer: user scope, no elevation, SHA256-verified against a signed manifest. Only when missing — an existing install is never upgraded, and a running one is never replaced, because a running one isn't missing. |
 | `git` | winget `Git.Git` | Used by the statusline and by the config backup step. |
 | `py` 3.14 | winget `Python.PythonInstallManager` | Runs the two Python hooks. The script also makes sure a plain `python` resolves, since that is what the hook command uses. |
 | Node.js LTS | Official MSI from nodejs.org | Resolved from the live release feed, not pinned. Needed for the TypeScript language server. |
 | .NET SDK (LTS) | winget `Microsoft.DotNet.SDK.<major>` | Needed for `csharp-ls`. The LTS major is resolved at run time; checked by installed SDK major, not just whether `dotnet` exists — an existing .NET 8 or 9 does not satisfy it. |
-| `rustup` | winget `Rustlang.Rustup` | Provides `cargo` (for `rtk`) and `rust-analyzer`. |
+| `rustup` | winget `Rustlang.Rustup` | **Only with `-WithRust`.** Provides `rust-analyzer`. |
 | `jq` | winget `jqlang.jq` | General JSON wrangling. |
 | `typescript-language-server` | `npm i -g` | Behind the `typescript-lsp` plugin. |
 | `csharp-ls` | `dotnet tool install -g` | Behind the `csharp-lsp` plugin. |
-| `rust-analyzer` | `rustup component add` | Behind the `rust-analyzer-lsp` plugin. |
+| `rust-analyzer` | `rustup component add` | **Only with `-WithRust`.** Behind the `rust-analyzer-lsp` plugin. |
+
+### Rust is opt-in
+
+By default this installs **no Rust at all** — `rtk` is a prebuilt binary from
+winget, so nothing else here needs a toolchain. That matters because rustup
+pulls ~200 MB from `static.rust-lang.org`, and corporate web filters have been
+seen to block those downloads outright, reporting them as a trojan.
+
+`-WithRust` adds three things together, so config and installed tools always
+agree:
+
+| | Default | `-WithRust` |
+| --- | --- | --- |
+| rustup + stable toolchain | — | ✅ |
+| `rust-analyzer` | — | ✅ |
+| `rust-analyzer-lsp` plugin installed | — | ✅ |
+| `rust-analyzer-lsp` in `settings.json` `enabledPlugins` | removed | kept |
+
+The installer edits `enabledPlugins` as it stages `settings.json`, then parses
+the result and compares the plugin sets, so a botched edit fails the run rather
+than reaching Claude Code. Everything else in the file — `defaultMode`, all 21
+deny rules, the hooks, the statusline — is untouched.
 
 ### Versions
 
 Nothing you already have is upgraded — these only apply when a command is
-missing. Most track latest automatically: `git`, `uv`, `jq`, Rust (rustup
-stable), `graphify`, `typescript-language-server`, `csharp-ls`, `ponytail`, and
-`rtk` (git HEAD). Node.js resolves the newest LTS from the live release feed at
-run time.
+missing. Most track latest automatically: `git`, `uv`, `jq`, `graphify`,
+`typescript-language-server`, `csharp-ls`, `ponytail`, `rtk` (winget), and with
+`-WithRust`, Rust (rustup stable). Node.js resolves the newest LTS from the live
+release feed at run time.
 
 Two are pinned and need a human bump eventually — override with a flag if you
 want something else:
@@ -112,7 +135,7 @@ support is resolved at run time from Microsoft's official releases index.
 ### ⚠️ The `rtk` name collision
 
 There are two unrelated tools called `rtk`. This setup needs
-**[rtk-ai/rtk](https://github.com/rtk-ai/rtk)** (currently 0.42.x), the
+**[rtk-ai/rtk](https://github.com/rtk-ai/rtk)** (currently 0.45.x), the
 token-optimizing proxy. The `rtk` crate on **crates.io is a different project** —
 "Rust Type Kit", stuck at 0.1.0 — so `cargo install rtk` gets you the wrong one.
 
@@ -120,16 +143,29 @@ This matters because a hook pipes *every* Bash tool call through `rtk hook claud
 With the wrong binary the subcommand doesn't exist and every Bash call in Claude
 Code fails.
 
-The installer therefore installs from git and verifies the result by running
-`rtk gain`, which only the correct tool supports. If you already have the
-crates.io `rtk`, it is replaced (with a warning).
+The winget package `rtk-ai.rtk` is the right one: its manifest is a portable zip
+pointing at rtk-ai/rtk's own GitHub release asset, pinned by SHA256. The
+installer verifies the result anyway by running `rtk gain`, which only the
+correct tool supports — the presence of *an* `rtk` on PATH is deliberately not
+treated as proof.
+
+If you already have the crates.io `rtk`, winget installs its own copy **alongside
+it**; unlike the old `cargo install --force`, it cannot overwrite the other one.
+Which one wins is then a PATH question, and the two orders differ: the installer
+prepends to the session PATH but Windows appends to the persisted one, so
+`~\.cargoin` (often first) can shadow the winget shim in the next terminal you
+open. The installer therefore ends by resolving `rtk` the way a **new** process
+will — Machine PATH then User PATH — and running `rtk gain` on *that* copy. If the
+wrong one would win, the run fails and names the file to delete, rather than
+reporting success on a setup that breaks the moment you open a new terminal.
 
 Plugins (installed via the `claude` CLI; if `claude` is not on PATH the script
 prints the exact commands and continues, since `settings.json` already enables
 them):
 
 - `ponytail@ponytail` — from `DietrichGebert/ponytail`
-- `typescript-lsp`, `csharp-lsp`, `rust-analyzer-lsp` — from `anthropics/claude-plugins-official`
+- `typescript-lsp`, `csharp-lsp` — from `anthropics/claude-plugins-official`
+- `rust-analyzer-lsp` — same marketplace, **only with `-WithRust`**
 
 ## What is deliberately NOT included
 

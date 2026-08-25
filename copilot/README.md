@@ -35,6 +35,7 @@ Flags (to pass these through the one-liner, see the
 
 | Flag | Effect |
 | --- | --- |
+| `-WithRust` | Install Rust: rustup + the stable toolchain, `rust-analyzer`, and the `rust` entry in `lsp-config.json`. Off by default — see [Rust is opt-in](#rust-is-opt-in). |
 | `-SkipToolchain` | Only copy the config; install no tools. |
 | `-SkipPlugins` | Skip the `copilot plugin` installs. |
 | `-SkipBackup` | Don't git-commit `~/.copilot` first. Overwrites with no undo path. Only needed if you're running `-SkipToolchain` on a machine without git. |
@@ -53,7 +54,7 @@ merges them, with the overlay winning on a collision.
 | --- | --- |
 | `shared/copilot-instructions.core.md` + `windows/config/copilot-instructions.append.md` | Global instructions loaded into every session: think before coding, simplicity first, surgical changes, goal-driven execution. Plus a terse-reporting preference and a Windows/Git-Bash rule about never putting `cd` in a compound command that also writes. **Composed into `~/.copilot/copilot-instructions.md` at install time** — see below. |
 | `shared/settings.json` | Model `gpt-5.6-terra`, `effortLevel: high`, startup tips off, and a footer showing model effort, directory, branch, context window, quota, agent and sandbox. Enables the `ponytail@ponytail` plugin and registers its marketplace. No paths, no shell — portable as-is. |
-| `shared/lsp-config.json` | Language servers for TypeScript/JS, C# and Rust, by bare command name (`typescript-language-server`, `csharp-ls`, `rust-analyzer`). |
+| `shared/lsp-config.json` | Language servers for TypeScript/JS, C# and Rust, by bare command name (`typescript-language-server`, `csharp-ls`, `rust-analyzer`). The `rust` entry is removed at install time unless `-WithRust` is passed. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse on Read/Edit/Write. Blocks secret-ish files — `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`. |
 | `shared/hooks/command_policy.py` | PreToolUse on Bash. Blocks `git push` and bare `cd`. |
 | `shared/hooks/worktree_guard.py` | PreToolUse on Bash. Denies `git worktree add` outside the allowed roots, so worktrees stop landing in the workspace root or `C:\`. |
@@ -85,25 +86,26 @@ Command-line tools (each skipped if already on PATH):
 
 | Tool | Via | Why |
 | --- | --- | --- |
-| `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook rewrites shell commands through `rtk hook copilot`. Note it comes from **git, not crates.io** — see the warning below. |
+| `rtk` | winget `rtk-ai.rtk` | **Required.** A hook rewrites shell commands through `rtk hook copilot`. A prebuilt binary — no Rust toolchain needed. Not the crates.io crate of the same name; see the warning below. |
 | `graphify` | `uv tool install graphifyy` | Backs the two graphify hooks. The PyPI package really is spelled with two y's. |
 | `copilot` | winget `GitHub.Copilot` | The Copilot CLI itself, if you don't already have it. You still log in with your own account. |
 | `git` | winget `Git.Git` | Used by the config backup step. |
 | `py` 3.14 | winget `Python.PythonInstallManager` | Runs the five Python hooks. The script also makes sure a plain `python` resolves, since that is what the hook commands use. |
 | Node.js LTS | Official MSI from nodejs.org | Resolved from the live release feed and SHA256-verified. Needed for the TypeScript language server. |
 | .NET SDK (LTS) | winget `Microsoft.DotNet.SDK.<major>` | Needed for `csharp-ls`. The LTS major is resolved at run time and checked by installed SDK major, not just whether `dotnet` exists. |
-| `rustup` | winget `Rustlang.Rustup` | Provides `cargo` (for `rtk`) and `rust-analyzer`. |
+| `rustup` | winget `Rustlang.Rustup` | **Only with `-WithRust`.** Provides `rust-analyzer`. |
 | `jq` | winget `jqlang.jq` | General JSON wrangling. |
 | `typescript-language-server` | `npm i -g` | Backs the `typescript` entry in `lsp-config.json`. |
 | `csharp-ls` | `dotnet tool install -g` | Backs the `csharp` entry. |
-| `rust-analyzer` | `rustup component add` | Backs the `rust` entry. |
+| `rust-analyzer` | `rustup component add` | **Only with `-WithRust`.** Backs the `rust` entry. |
 
 ### Versions
 
 Nothing you already have is upgraded — these only apply when a command is
-missing. Most track latest automatically: `copilot`, `git`, `uv`, `jq`, Rust
-(rustup stable), `graphify`, `typescript-language-server`, `csharp-ls`,
-`ponytail`, and `rtk` (git HEAD). Node.js and .NET resolve their newest LTS at
+missing. Most track latest automatically: `copilot`, `git`, `uv`, `jq`,
+`graphify`, `typescript-language-server`, `csharp-ls`, `ponytail`, `rtk`
+(winget), and with `-WithRust`, Rust (rustup stable). Node.js and .NET resolve
+their newest LTS at
 run time.
 
 Python 3.14 is pinned and needs a human bump eventually — override with
@@ -112,16 +114,42 @@ Python 3.14 is pinned and needs a human bump eventually — override with
 ### ⚠️ The `rtk` name collision
 
 There are two unrelated tools called `rtk`. This setup needs
-**[rtk-ai/rtk](https://github.com/rtk-ai/rtk)** (currently 0.42.x), the
+**[rtk-ai/rtk](https://github.com/rtk-ai/rtk)** (currently 0.45.x), the
 token-optimizing proxy. The `rtk` crate on **crates.io is a different project** —
 "Rust Type Kit", stuck at 0.1.0 — so `cargo install rtk` gets you the wrong one.
 
 This matters because `rtk.json` pipes shell commands through `rtk hook copilot`.
 With the wrong binary the subcommand doesn't exist.
 
-The installer therefore installs from git and verifies the result by running
-`rtk gain`, which only the correct tool supports. If you already have the
-crates.io `rtk`, it is replaced (with a warning).
+The winget package `rtk-ai.rtk` is the right one: its manifest is a portable zip
+pointing at rtk-ai/rtk's own GitHub release asset, pinned by SHA256. The
+installer verifies the result anyway by running `rtk gain`, which only the
+correct tool supports — the presence of *an* `rtk` on PATH is deliberately not
+treated as proof.
+
+If you already have the crates.io `rtk`, winget installs its own copy **alongside
+it**; unlike the old `cargo install --force`, it cannot overwrite the other one.
+Which one wins is then a PATH question, and the two orders differ: the installer
+prepends to the session PATH but Windows appends to the persisted one, so
+`~\.cargoin` (often first) can shadow the winget shim in the next terminal you
+open. The installer therefore ends by resolving `rtk` the way a **new** process
+will — Machine PATH then User PATH — and running `rtk gain` on *that* copy. If the
+wrong one would win, the run fails and names the file to delete, rather than
+reporting success on a setup that breaks the moment you open a new terminal.
+
+### Rust is opt-in
+
+By default this installs **no Rust at all** — `rtk` is a prebuilt binary from
+winget, so nothing else here needs a toolchain. That matters because rustup pulls
+~200 MB from `static.rust-lang.org`, and corporate web filters have been seen to
+block those downloads outright, reporting them as a trojan.
+
+`-WithRust` adds rustup + the stable toolchain and `rust-analyzer`, and keeps the
+`rust` server in `lsp-config.json`. Without it that entry is removed as the file
+is staged, so no LSP points at a `rust-analyzer` that was never installed. The
+installer parses the result and compares the server sets, so a botched edit fails
+the run rather than reaching Copilot; `typescript` and `csharp` are untouched, as
+are the file's CRLF line endings.
 
 Plugins (installed via the `copilot` CLI; if `copilot` is not on PATH the script
 prints the exact commands and continues, since `settings.json` already enables

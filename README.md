@@ -160,7 +160,7 @@ apt/dnf/pacman/zypper plus `rustup` and `uv` on WSL, Homebrew on macOS.
 
 | Tool | Why | Claude | Copilot |
 | --- | --- | :-: | :-: |
-| `rtk` | **Required.** A hook routes every shell command through `rtk hook` — a token-optimizing CLI proxy that claims 60–90% savings on dev operations. Installed **from git, not crates.io**; the crates.io `rtk` is an unrelated project. | ✅ | ✅ |
+| `rtk` | **Required.** A hook routes every shell command through `rtk hook` — a token-optimizing CLI proxy that claims 60–90% savings on dev operations. On Windows it comes from winget (`rtk-ai.rtk`), a prebuilt binary needing no Rust; on WSL and macOS it is still built with `cargo`. Either way it is **rtk-ai/rtk, not the unrelated crates.io crate of the same name**. | ✅ | ✅ |
 | `graphify` | Backs the graphify skill (Claude) and the two graphify hooks (Copilot). The PyPI package is spelled `graphifyy`. | ✅ | ✅ |
 | The CLI itself | `claude` or `copilot`, from that tool's own official installer — user-scope, no elevation. Only when missing, so an existing install is never upgraded and a running one is never replaced. You still log in yourself. Copilot comes from winget on Windows, `gh.io/copilot-install` on WSL and the `copilot-cli` cask on macOS. | ✅ | ✅ |
 | Homebrew | macOS only, and everything else depends on it. `brew shellenv` is persisted to your profile, which Homebrew's own installer only prints as an instruction. | macOS | — |
@@ -169,8 +169,21 @@ apt/dnf/pacman/zypper plus `rustup` and `uv` on WSL, Homebrew on macOS.
 | `jq` | General JSON wrangling. On WSL, `curl` too. | ✅ | ✅ |
 | Node.js LTS | Only to provide `typescript-language-server`. | ✅ | ✅ |
 | .NET SDK (LTS) | Only to provide `csharp-ls`. The LTS major is resolved at run time on Windows and WSL; macOS uses Microsoft's `dotnet-install.sh --channel LTS`, which names the policy directly. | ✅ | ✅ |
-| `rustup` | Provides `cargo` (which builds `rtk`) and `rust-analyzer`. | ✅ | ✅ |
-| `typescript-language-server`, `csharp-ls`, `rust-analyzer` | The three language servers the LSP plugins and `lsp-config.json` drive. | ✅ | ✅ |
+| `rustup` | **Windows: opt-in, off by default** — pass `-WithRust`. Nothing else needs it there, since `rtk` is a prebuilt binary, and rustup's ~200 MB of downloads from `static.rust-lang.org` have been blocked outright by corporate filters reporting them as a trojan. On WSL and macOS it is still installed, because `cargo` builds `rtk` there. | ✅ | ✅ |
+| `typescript-language-server`, `csharp-ls`, `rust-analyzer` | The language servers the LSP plugins and `lsp-config.json` drive. On Windows, `rust-analyzer` comes only with `-WithRust`, and the config is written to match — no `rust-analyzer-lsp` in `enabledPlugins`, no `rust` entry in `lsp-config.json`. | ✅ | ✅ |
+
+#### Rust is opt-in on Windows
+
+A default Windows install downloads nothing from `static.rust-lang.org`, and the
+config it writes matches what it installed. Pass `-WithRust` to get the toolchain,
+`rust-analyzer`, and the Rust LSP wiring back:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1))) -WithRust
+```
+
+WSL and macOS are unchanged — they still install Rust, because `cargo` is how
+`rtk` is built there.
 
 ### What's in the global instructions
 
