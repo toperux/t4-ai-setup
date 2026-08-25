@@ -12,8 +12,8 @@ your own account.
 | Platform | Claude Code | Copilot CLI |
 | --- | --- | --- |
 | Windows 11 | ✅ | ✅ |
-| WSL | ✅ — [detail](claude/wsl/README.md) | ⏳ planned — [notes](copilot/wsl/README.md) |
-| macOS | ✅ — [detail](claude/macos/README.md) (untested on hardware) | ⏳ planned — [notes](copilot/macos/README.md) |
+| WSL | ✅ — [detail](claude/wsl/README.md) | ✅ — [detail](copilot/wsl/README.md) |
+| macOS | ✅ — [detail](claude/macos/README.md) (untested on hardware) | ✅ — [detail](copilot/macos/README.md) (untested on hardware) |
 
 ## Install
 
@@ -43,6 +43,18 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-cl
 irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-windows.ps1 | iex
 ```
 
+**Copilot CLI — WSL** (bash, inside the distro):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-wsl.sh | bash
+```
+
+**Copilot CLI — macOS** (bash):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-macos.sh | bash
+```
+
 All are idempotent — safe to re-run, and anything already installed is skipped.
 
 ### Prerequisites
@@ -62,16 +74,21 @@ log in with your own account either way.
 **WSL:**
 
 - `sudo` rights, plus `curl` and `tar`.
-- **`python3` is required, not optional** — it renders `settings.json` and both
-  hooks run under it. The installer stops early if it is missing.
+- **`python3` is required, not optional** — it validates the installed JSON and
+  every hook runs under it (and for Claude it also renders `settings.json`). The
+  installer stops early if it is missing.
 
 **macOS:**
 
 - An admin account. Homebrew is installed if missing and will ask for your
   password; `curl` and `tar` already ship with the OS.
-- ⚠️ **Untested on macOS hardware.** The platform-neutral half is covered by the
-  WSL test run; the Homebrew, .NET and `claude` steps are not. See
-  [`claude/macos/README.md`](claude/macos/README.md).
+- **macOS 13+ for the Copilot installer** — the `copilot-cli` cask requires it.
+- ⚠️ **Untested on macOS hardware.** Both scripts do run end-to-end on a real
+  bash 3.2 (what `/bin/bash` is on a Mac), and the platform-neutral half is
+  covered by the WSL test run — but the Homebrew bootstrap, the cask install and
+  the .NET SDK script have never actually executed. See
+  [`claude/macos/README.md`](claude/macos/README.md) and
+  [`copilot/macos/README.md`](copilot/macos/README.md).
 
 ### Passing flags
 
@@ -103,7 +120,9 @@ its own — `-Ref` on Windows, `--ref` on WSL and macOS — see
   [`claude/macos/README.md`](claude/macos/README.md) for macOS.
 - **Copilot CLI** — writes 11 files into `~/.copilot` (instructions, settings,
   LSP config, five Python hooks, hook registrations) and the same toolchain.
-  Detail: [`copilot/README.md`](copilot/README.md).
+  Detail: [`copilot/README.md`](copilot/README.md) for Windows,
+  [`copilot/wsl/README.md`](copilot/wsl/README.md) for WSL,
+  [`copilot/macos/README.md`](copilot/macos/README.md) for macOS.
 
 Neither installer upgrades a tool you already have; version policy only applies
 when a command is missing. Both git-commit your existing `~/.claude` /
@@ -120,10 +139,10 @@ apt/dnf/pacman/zypper plus `rustup` and `uv` on WSL, Homebrew on macOS.
 | --- | --- | :-: | :-: |
 | `rtk` | **Required.** A hook routes every shell command through `rtk hook` — a token-optimizing CLI proxy that claims 60–90% savings on dev operations. Installed **from git, not crates.io**; the crates.io `rtk` is an unrelated project. | ✅ | ✅ |
 | `graphify` | Backs the graphify skill (Claude) and the two graphify hooks (Copilot). The PyPI package is spelled `graphifyy`. | ✅ | ✅ |
-| The CLI itself | `claude` or `copilot`, from that tool's own official installer — user-scope, checksum-verified, no elevation. Only when missing, so an existing install is never upgraded and a running one is never replaced. You still log in yourself. | ✅ | ✅ |
+| The CLI itself | `claude` or `copilot`, from that tool's own official installer — user-scope, no elevation. Only when missing, so an existing install is never upgraded and a running one is never replaced. You still log in yourself. Copilot comes from winget on Windows, `gh.io/copilot-install` on WSL and the `copilot-cli` cask on macOS. | ✅ | ✅ |
 | Homebrew | macOS only, and everything else depends on it. `brew shellenv` is persisted to your profile, which Homebrew's own installer only prints as an instruction. | macOS | — |
 | `git` | The pre-write config backup — and, for Claude, the statusline's branch segment. | ✅ | ✅ |
-| Python | Runs the hooks — two for Claude, five for Copilot. Windows installs 3.14, macOS installs Homebrew's; **on WSL `python3` must already exist** and the installer stops early if it doesn't. | ✅ | ✅ |
+| Python | Runs the hooks — two for Claude, five for Copilot. Windows installs 3.14, macOS installs Homebrew's (probed by *running* `python3`, since `/usr/bin/python3` is a stub on a Mac with no Command Line Tools); **on WSL `python3` must already exist** and the installer stops early if it doesn't. | ✅ | ✅ |
 | `jq` | General JSON wrangling. On WSL, `curl` too. | ✅ | ✅ |
 | Node.js LTS | Only to provide `typescript-language-server`. | ✅ | ✅ |
 | .NET SDK (LTS) | Only to provide `csharp-ls`. The LTS major is resolved at run time on Windows and WSL; macOS uses Microsoft's `dotnet-install.sh --channel LTS`, which names the policy directly. | ✅ | ✅ |
@@ -216,6 +235,8 @@ install-claude-windows.ps1     entry point, downloads this repo and runs the ins
 install-claude-wsl.sh
 install-claude-macos.sh
 install-copilot-windows.ps1
+install-copilot-wsl.sh
+install-copilot-macos.sh
 claude/
   shared/                      config that is the same on every platform
   windows/
@@ -227,7 +248,7 @@ claude/
   macos/
     setup-claude-macos.sh
     config/                    the macOS-only config
-copilot/                       same shape, Windows only so far
+copilot/                       same shape, same three platforms
 ```
 
 The Windows bootstrap downloads a zip; the WSL and macOS ones download a
@@ -236,8 +257,8 @@ zip, the tarball preserves the executable bit.
 
 Config is split into a platform-neutral `shared/` tree and a per-platform
 overlay, and the installer merges the two with the overlay winning. That keeps
-the portable ~85% of the config in one place rather than triplicated once WSL
-and macOS land.
+the portable ~85% of the config in one place rather than triplicated across the
+three platforms.
 
 The one file that is neither fully portable nor fully platform-specific — the
 global instructions — is **composed at install time** from

@@ -183,10 +183,21 @@ The repo is local only and never pushed.
 ## Not yet tested on a Mac
 
 This port was written against the macOS draft and reviewed line by line, but no
-part of it has been executed on macOS hardware — there is none to hand. What
-*has* been verified is everything platform-neutral: the config merge, the
-composed `CLAUDE.md`, the transactional swap and rollback, and the plugin
-matcher all come from the WSL installer unchanged and are covered by its test
-run. The macOS-specific parts — the Homebrew bootstrap, the `brew shellenv`
-persistence, the .NET SDK script and the `claude` install — are unexercised.
-Expect to fix something on first run.
+part of it has been executed on macOS hardware — there is none to hand.
+
+What *has* been verified:
+
+- **The whole script runs on a real bash 3.2** — the version macOS ships as
+  `/bin/bash`, and what `bash setup-claude-macos.sh` resolves to on a Mac
+  without Homebrew's bash. Built from source specifically to test this rather
+  than assumed from reading. It parses, installs, re-runs idempotently, rolls
+  back correctly when the swap is made to fail partway, and renders `--help`.
+  The one construct that genuinely differs on 3.2 — expanding an empty array
+  under `set -u`, which `rollback()` does at its worst moment — was checked
+  directly.
+- Everything platform-neutral: the config merge, the composed `CLAUDE.md`, the
+  transactional swap and rollback, and the plugin matcher all come from the WSL
+  installer unchanged and are covered by its test run.
+
+Still unexercised: the Homebrew bootstrap, the `brew shellenv` persistence, the
+.NET SDK script and the `claude` install. Expect to fix something on first run.

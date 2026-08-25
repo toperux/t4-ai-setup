@@ -5,6 +5,10 @@ LSP config and five hooks — plus the command-line tools those settings depend
 on. Everything lands in `~/.copilot`. No credentials, chat history or project
 memories are included; you log in with your own account.
 
+This page covers **Windows**. For the other two platforms see
+[`wsl/README.md`](wsl/README.md) and [`macos/README.md`](macos/README.md); the
+config in [`shared/`](shared) is common to all three.
+
 ## Prerequisites
 
 - Windows 11 with `winget` available
@@ -64,8 +68,8 @@ merges them, with the overlay winning on a collision.
 
 Everything in it is platform-neutral except the closing `# bash on Windows`
 section. Shipping the whole file per platform would triplicate the other ~70
-lines once WSL and macOS land, and they would drift apart. So the file is cut at
-that heading — `shared/copilot-instructions.core.md` plus
+lines across Windows, WSL and macOS, and they would drift apart. So the file is
+cut at that heading — `shared/copilot-instructions.core.md` plus
 `windows/config/copilot-instructions.append.md` — and the installer joins the
 two **byte for byte**. The cut is a byte offset of the original, so
 `core + append` reproduces it exactly: no re-encoding, no line-ending changes
