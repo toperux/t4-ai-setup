@@ -12,28 +12,36 @@ your own account.
 | Platform | Claude Code | Copilot CLI |
 | --- | --- | --- |
 | Windows 11 | ✅ | ✅ |
-| WSL | ⏳ planned — [notes](claude/wsl/README.md) | ⏳ planned — [notes](copilot/wsl/README.md) |
+| WSL | ✅ — [detail](claude/wsl/README.md) | ⏳ planned — [notes](copilot/wsl/README.md) |
 | macOS | ⏳ planned — [notes](claude/macos/README.md) | ⏳ planned — [notes](copilot/macos/README.md) |
 
 ## Install
 
-Two separate commands — run whichever you want, or both.
+One command per tool — run whichever you want, or both.
 
-**Claude Code:**
+**Claude Code — Windows** (PowerShell):
 
 ```powershell
 irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1 | iex
 ```
 
-**Copilot CLI:**
+**Claude Code — WSL** (bash, inside the distro):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-wsl.sh | bash
+```
+
+**Copilot CLI — Windows** (PowerShell):
 
 ```powershell
 irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-windows.ps1 | iex
 ```
 
-Both are idempotent — safe to re-run, and anything already installed is skipped.
+All are idempotent — safe to re-run, and anything already installed is skipped.
 
 ### Prerequisites
+
+**Windows:**
 
 - Windows 11 with `winget` available.
 - For Claude Code: the `claude` CLI already installed and logged in — the
@@ -43,23 +51,39 @@ Both are idempotent — safe to re-run, and anything already installed is skippe
   Node.js MSI cannot self-elevate. If you already have `node`, a normal prompt
   is fine.
 
+**WSL:**
+
+- `sudo` rights, plus `curl` and `tar`.
+- **`python3` is required, not optional** — it renders `settings.json` and both
+  hooks run under it. The installer stops early if it is missing.
+- The `claude` CLI already installed and logged in.
+
 ### Passing flags
 
-`| iex` cannot pass arguments, so build a scriptblock instead:
+On Windows, `| iex` cannot pass arguments, so build a scriptblock instead:
 
 ```powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1))) -SkipToolchain -SkipPlugins
 ```
 
-The full installer flag list is in [`claude/README.md`](claude/README.md) and
+On WSL, flags pass straight through after `-s --`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-wsl.sh | bash -s -- --skip-toolchain --skip-plugins
+```
+
+The full installer flag list is in [`claude/README.md`](claude/README.md),
+[`claude/wsl/README.md`](claude/wsl/README.md) and
 [`copilot/README.md`](copilot/README.md). The bootstrap itself takes one flag of
-its own, `-Ref` — see [Pinning to a fixed version](#pinning-to-a-fixed-version).
+its own — `-Ref` on Windows, `--ref` on WSL — see
+[Pinning to a fixed version](#pinning-to-a-fixed-version).
 
 ## What each installer does
 
 - **Claude Code** — writes 16 files into `~/.claude` (instructions, settings,
   two Python hooks, a statusline, the graphify skill) and installs the tools
-  those settings need. Detail: [`claude/README.md`](claude/README.md).
+  those settings need. Detail: [`claude/README.md`](claude/README.md) for
+  Windows, [`claude/wsl/README.md`](claude/wsl/README.md) for WSL.
 - **Copilot CLI** — writes 11 files into `~/.copilot` (instructions, settings,
   LSP config, five Python hooks, hook registrations) and the same toolchain.
   Detail: [`copilot/README.md`](copilot/README.md).
@@ -105,15 +129,23 @@ See the per-tool READMEs.
 .gitattributes                 `* -text` — config files ship byte for byte
 .gitignore
 install-claude-windows.ps1     entry point, downloads this repo and runs the installer
+install-claude-wsl.sh
 install-copilot-windows.ps1
 claude/
   shared/                      config that is the same on every platform
   windows/
     setup-claude-windows.ps1   the installer
     config/                    the Windows-only config
-  wsl/  macos/                 placeholders
-copilot/                       same shape
+  wsl/
+    setup-claude-wsl.sh
+    config/                    the WSL-only config
+  macos/                       placeholder
+copilot/                       same shape, Windows only so far
 ```
+
+The Windows bootstrap downloads a zip; the WSL one downloads a tarball, because
+`tar` is on every distro while `unzip` often isn't — and unlike the zip, the
+tarball preserves the executable bit.
 
 Config is split into a platform-neutral `shared/` tree and a per-platform
 overlay, and the installer merges the two with the overlay winning. That keeps
