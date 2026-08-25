@@ -61,7 +61,7 @@ merges them, with the overlay winning on a collision.
 
 Everything in it is platform-neutral except the closing `# bash on Windows`
 section. Shipping the whole file per platform would triplicate the other ~70
-lines once WSL and macOS land, and they would drift apart. So the file is cut
+lines across Windows, WSL and macOS, and they would drift apart. So the file is cut
 at that heading — `shared/CLAUDE.core.md` plus `windows/config/CLAUDE.append.md`
 — and the installer joins the two **byte for byte**. The cut is a byte offset of
 the original, so `core + append` reproduces it exactly: no re-encoding, no
