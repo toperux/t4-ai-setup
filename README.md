@@ -13,7 +13,7 @@ your own account.
 | --- | --- | --- |
 | Windows 11 | ✅ | ✅ |
 | WSL | ✅ — [detail](claude/wsl/README.md) | ✅ — [detail](copilot/wsl/README.md) |
-| macOS | ✅ — [detail](claude/macos/README.md) (untested on hardware) | ✅ — [detail](copilot/macos/README.md) (untested on hardware) |
+| macOS | ✅ — [detail](claude/macos/README.md) (tested on Apple Silicon) | ✅ — [detail](copilot/macos/README.md) (cask install untested) |
 
 ## Before you run it
 
@@ -107,8 +107,10 @@ elevation.
 every hook, and the installer stops early without it.
 
 **🍎 macOS** — an admin account. Homebrew is installed if missing and will ask
-for your password; **macOS 13+** is required for Copilot.
-⚠️ [Untested on macOS hardware](claude/macos/README.md#not-yet-tested-on-a-mac).
+for your password; **macOS 13+** is required for Copilot. The Claude installer
+is [tested on Apple Silicon](claude/macos/README.md#tested-on-a-mac); for
+Copilot the [`copilot-cli` cask install is still
+unexercised](copilot/macos/README.md#partly-tested-on-a-mac).
 
 ## Passing flags
 

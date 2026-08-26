@@ -191,10 +191,22 @@ git -C ~/.copilot checkout <commit-before-the-backup> -- .
 
 The repo is local only and never pushed.
 
-## Not yet tested on a Mac
+## Partly tested on a Mac
 
-This port was written from the WSL installer and reviewed line by line, but no
-part of it has been executed on macOS hardware — there is none to hand.
+This installer has not itself been run on macOS hardware, but most of what it
+does now has been. The Claude macOS installer *has* been run end-to-end on Apple
+Silicon, on a machine with no Homebrew, and the functions that carry the macOS
+work are **byte-identical between the two scripts**: `install_homebrew`,
+`persist_line`, `add_path`, `brew_install`, `install_dotnet` and
+`have_dotnet_sdk`. So the Homebrew bootstrap, the `brew shellenv` persistence
+and `dotnet-install.sh --channel LTS` are verified on hardware, and the rest of
+`install_toolchain` — Node, `rustup`, `cargo` building `rtk`, `graphify`, the
+language servers — differs from Claude's only in comments and warning text.
+
+**What is still genuinely unexercised here is `brew install --cask copilot-cli`,**
+and this package's own config write and hooks. That one cask line is the real
+difference between the two toolchain functions. Expect that to be where anything
+breaks.
 
 What *has* been verified:
 
@@ -214,6 +226,6 @@ What *has* been verified:
   needs no password; `dot.net`'s `--channel LTS` and the Homebrew install script
   both resolve.
 
-Still unexercised: the Homebrew bootstrap itself, the `brew shellenv`
-persistence, the cask *install*, and `dotnet-install.sh` actually running.
-Expect to fix something on first run.
+Still unexercised: the cask *install*, this package's config write and hooks on
+a Mac, and the `/usr/local` branch of the Homebrew prefix loop — the Intel
+layout, which the Apple Silicon run did not touch.

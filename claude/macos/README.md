@@ -180,12 +180,15 @@ git -C ~/.claude checkout <commit-before-the-backup> -- .
 
 The repo is local only and never pushed.
 
-## Not yet tested on a Mac
+## Tested on a Mac
 
-This port was written against the macOS draft and reviewed line by line, but no
-part of it has been executed on macOS hardware — there is none to hand.
+This installer has been run end-to-end on macOS hardware — Apple Silicon, on a
+machine with no Homebrew, so the bootstrap really did run — and it works. That
+covers the parts that used to be listed here as unverified: the Homebrew
+install, persisting `brew shellenv` to the profile, `dotnet-install.sh --channel
+LTS`, the `claude` install, and building `rtk` with `cargo`.
 
-What *has* been verified:
+Also verified, and still worth knowing:
 
 - **The whole script runs on a real bash 3.2** — the version macOS ships as
   `/bin/bash`, and what `bash setup-claude-macos.sh` resolves to on a Mac
@@ -199,5 +202,6 @@ What *has* been verified:
   transactional swap and rollback, and the plugin matcher all come from the WSL
   installer unchanged and are covered by its test run.
 
-Still unexercised: the Homebrew bootstrap, the `brew shellenv` persistence, the
-.NET SDK script and the `claude` install. Expect to fix something on first run.
+One caveat remains: only the Apple Silicon layout has been exercised. Homebrew's
+prefix is resolved at run time by trying `/opt/homebrew` then `/usr/local`, and
+the `/usr/local` branch — the Intel layout — has still never run on hardware.

@@ -195,5 +195,8 @@ re-run, a config filename containing a space, the missing-overlay hard stop,
 files the package doesn't ship surviving, both backup branches including an
 existing repo reached through a symlink, and the macOS platform guard.
 
-The Homebrew, cask and `dotnet-install.sh` paths belong to the macOS port and
-are unexercised — see [`../macos/README.md`](../macos/README.md).
+The Homebrew and `dotnet-install.sh` paths belong to the macOS port. They are
+not covered by this run, but they are byte-identical to the Claude macOS
+installer's, which has been run on Apple Silicon hardware. The `copilot-cli`
+cask install remains unexercised — see
+[`../macos/README.md`](../macos/README.md).
