@@ -17,33 +17,28 @@ your own account.
 
 ## Before you run it
 
-This replaces your **user-level** config for the tool you install, and one Claude
-setting is deliberately permissive — worth a conscious decision rather than a
-surprise, especially if you are rolling this out to other people:
+This replaces your **user-level** config for the tool you install, and one
+Claude setting is deliberately permissive — worth a conscious decision rather
+than a surprise, especially if you are rolling this out to other people:
 
 - `permissions.defaultMode: "auto"` — tool calls auto-approve instead of
-  prompting.
+  prompting. Claude Code's own dangerous-mode warning is left in place. Copilot
+  has no equivalent setting.
 
-Claude Code's own dangerous-mode warning is left in place, so that prompt still
-appears. A deny list (`.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`,
-`web.config`, `local.settings.json`) and a PreToolUse hook also block reads and
-edits of secret-ish files — 19 rules on WSL and macOS, 21 on Windows, which also
-denies `Bash(cd *)` and `Bash(pushd *)` for the Git Bash reason in the global
-instructions. The deny list assumes .NET / Azure Functions projects. Skim
-[`claude/windows/config/settings.json`](claude/windows/config/settings.json)
-(the WSL and macOS overlays carry the same settings) and adjust before running
-if that doesn't suit you. The Copilot package has no equivalent setting.
-
-Your existing config is git-committed before anything is written, so there is an
-undo path — each per-tool README has the exact restore command. No credentials,
-chat history or project memories are included in the package.
+A deny list and a PreToolUse hook block reads and edits of secret-ish files, and
+your existing config is git-committed before anything is written, so there is an
+undo path. Full detail, and what to adjust if the defaults don't suit you:
+[docs/security.md](docs/security.md).
 
 ## Install
 
-One command per tool — run whichever you want, or both.
+One command per tool — run whichever you want, or both. All are idempotent —
+safe to re-run, and anything already installed is skipped.
+
+### 🪟 Windows
 
 <details open>
-<summary><b>Windows</b> — PowerShell</summary>
+<summary>PowerShell — show commands</summary>
 
 **Claude Code**
 
@@ -59,8 +54,10 @@ irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-copilot-w
 
 </details>
 
+### 🐧 WSL
+
 <details>
-<summary><b>WSL</b> — bash, inside the distro</summary>
+<summary>bash, inside the distro — show commands</summary>
 
 **Claude Code**
 
@@ -76,8 +73,10 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-co
 
 </details>
 
+### 🍎 macOS
+
 <details>
-<summary><b>macOS</b> — bash</summary>
+<summary>bash — show commands</summary>
 
 **Claude Code**
 
@@ -93,54 +92,35 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-co
 
 </details>
 
-All are idempotent — safe to re-run, and anything already installed is skipped.
-
-### Prerequisites
+## Prerequisites
 
 **The CLI itself is installed for you.** Whichever installer you run puts the
 `claude` or `copilot` CLI on your machine if it isn't there already, using that
 tool's own official installer. Nothing already installed is upgraded, and you
 log in with your own account either way.
 
-<details open>
-<summary><b>Windows</b></summary>
+**🪟 Windows** — `winget`, plus **an elevated PowerShell if Node.js is not yet
+installed**, because the Node MSI cannot self-elevate. Nothing else needs
+elevation.
 
-- Windows 11 with `winget` available.
-- **An elevated PowerShell if Node.js is not yet installed** — the official
-  Node.js MSI cannot self-elevate. If you already have `node`, a normal prompt
-  is fine. Nothing else here needs elevation.
+**🐧 WSL** — `sudo`, `curl`, `tar`, and **`python3` already present**: it runs
+every hook, and the installer stops early without it.
 
-</details>
+**🍎 macOS** — an admin account. Homebrew is installed if missing and will ask
+for your password; **macOS 13+** is required for Copilot.
+⚠️ [Untested on macOS hardware](claude/macos/README.md#not-yet-tested-on-a-mac).
 
-<details>
-<summary><b>WSL</b></summary>
+## Passing flags
 
-- `sudo` rights, plus `curl` and `tar`.
-- **`python3` is required, not optional** — it validates the installed JSON and
-  every hook runs under it (and for Claude it also renders `settings.json`). The
-  installer stops early if it is missing.
+The full installer flag list is in each per-tool README, linked under
+[Documentation](#documentation). The bootstrap itself takes one flag of its own
+— `-Ref` on Windows, `--ref` on WSL and macOS — see
+[Pinning to a fixed version](docs/security.md#pinning-to-a-fixed-version).
 
-</details>
-
-<details>
-<summary><b>macOS</b> — ⚠️ untested on hardware</summary>
-
-- An admin account. Homebrew is installed if missing and will ask for your
-  password; `curl` and `tar` already ship with the OS.
-- **macOS 13+ for the Copilot installer** — the `copilot-cli` cask requires it.
-- ⚠️ **Untested on macOS hardware.** Both scripts do run end-to-end on a real
-  bash 3.2 (what `/bin/bash` is on a Mac), and the platform-neutral half is
-  covered by the WSL test run — but the Homebrew bootstrap, the cask install and
-  the .NET SDK script have never actually executed. See
-  [`claude/macos/README.md`](claude/macos/README.md) and
-  [`copilot/macos/README.md`](copilot/macos/README.md).
-
-</details>
-
-### Passing flags
+### 🪟 Windows
 
 <details open>
-<summary><b>Windows</b> — build a scriptblock</summary>
+<summary>build a scriptblock — show command</summary>
 
 `| iex` cannot pass arguments, so pipe the script into a scriptblock instead:
 
@@ -150,8 +130,10 @@ log in with your own account either way.
 
 </details>
 
+### 🐧 WSL
+
 <details>
-<summary><b>WSL</b> — after <code>-s --</code></summary>
+<summary>after <code>-s --</code> — show command</summary>
 
 Flags pass straight through:
 
@@ -161,8 +143,10 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-cl
 
 </details>
 
+### 🍎 macOS
+
 <details>
-<summary><b>macOS</b> — after <code>-s --</code></summary>
+<summary>after <code>-s --</code> — show command</summary>
 
 Same as WSL, with the macOS bootstrap:
 
@@ -172,180 +156,32 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-cl
 
 </details>
 
-The full installer flag list is in [`claude/README.md`](claude/README.md),
-[`claude/wsl/README.md`](claude/wsl/README.md),
-[`claude/macos/README.md`](claude/macos/README.md) and
-[`copilot/README.md`](copilot/README.md). The bootstrap itself takes one flag of
-its own — `-Ref` on Windows, `--ref` on WSL and macOS — see
-[Pinning to a fixed version](#pinning-to-a-fixed-version).
+## What you get
 
-## What each installer does
+- **Claude Code** — 16 files in `~/.claude`: instructions, settings, two Python
+  hooks, a statusline, the graphify skill.
+- **Copilot CLI** — 11 files in `~/.copilot`: instructions, settings, LSP
+  config, five Python hooks, hook registrations.
 
-- **Claude Code** — writes 16 files into `~/.claude` (instructions, settings,
-  two Python hooks, a statusline, the graphify skill) and installs the tools
-  those settings need. Detail: [`claude/README.md`](claude/README.md) for
-  Windows, [`claude/wsl/README.md`](claude/wsl/README.md) for WSL,
-  [`claude/macos/README.md`](claude/macos/README.md) for macOS.
-- **Copilot CLI** — writes 11 files into `~/.copilot` (instructions, settings,
-  LSP config, five Python hooks, hook registrations) and the same toolchain.
-  Detail: [`copilot/README.md`](copilot/README.md) for Windows,
-  [`copilot/wsl/README.md`](copilot/wsl/README.md) for WSL,
-  [`copilot/macos/README.md`](copilot/macos/README.md) for macOS.
+Plus the tools those settings need — `rtk`, `graphify`, `git`, Python, `jq`,
+Node.js, the .NET SDK and three language servers — each installed only if it is
+missing. On Windows, Rust is opt-in: pass `-WithRust`.
 
-Neither installer upgrades a tool you already have; version policy only applies
-when a command is missing. Both git-commit your existing `~/.claude` /
-`~/.copilot` into a local repo before writing anything, so there is an undo
-path.
+## Documentation
 
-### Tools it checks for, and installs only if missing
+| | |
+| --- | --- |
+| [What it installs](docs/what-it-installs.md) | Every tool and why, the Rust story, the global instructions, skills, plugins |
+| [Security and backups](docs/security.md) | Permissions, the deny list, the undo path, running remote code, pinning a version |
+| [Architecture](docs/architecture.md) | Repo layout, the `shared/` overlay, how the instructions file is composed |
 
-Each one is probed on PATH first and skipped if it is already there. Sources
-differ by platform — winget plus the official Node MSI on Windows,
-apt/dnf/pacman/zypper plus `rustup` and `uv` on WSL, Homebrew on macOS.
+Per tool and platform — file lists, full flag tables, the `rtk` name collision,
+and the exact restore command:
 
-| Tool | Why | Claude | Copilot |
-| --- | --- | :-: | :-: |
-| `rtk` | **Required.** A hook routes every shell command through `rtk hook` — a token-optimizing CLI proxy that claims 60–90% savings on dev operations. On Windows it comes from winget (`rtk-ai.rtk`), a prebuilt binary needing no Rust; on WSL and macOS it is still built with `cargo`. Either way it is **rtk-ai/rtk, not the unrelated crates.io crate of the same name**. | ✅ | ✅ |
-| `graphify` | Backs the graphify skill (Claude) and the two graphify hooks (Copilot). The PyPI package is spelled `graphifyy`. | ✅ | ✅ |
-| The CLI itself | `claude` or `copilot`, from that tool's own official installer — user-scope, no elevation. Only when missing, so an existing install is never upgraded and a running one is never replaced. You still log in yourself. Copilot comes from winget on Windows, `gh.io/copilot-install` on WSL and the `copilot-cli` cask on macOS. | ✅ | ✅ |
-| Homebrew | macOS only, and everything else depends on it. `brew shellenv` is persisted to your profile, which Homebrew's own installer only prints as an instruction. | macOS | — |
-| `git` | The pre-write config backup — and, for Claude, the statusline's branch segment. | ✅ | ✅ |
-| Python | Runs the hooks — two for Claude, five for Copilot. Windows installs 3.14, macOS installs Homebrew's (probed by *running* `python3`, since `/usr/bin/python3` is a stub on a Mac with no Command Line Tools); **on WSL `python3` must already exist** and the installer stops early if it doesn't. | ✅ | ✅ |
-| `jq` | General JSON wrangling. On WSL, `curl` too. | ✅ | ✅ |
-| Node.js LTS | Only to provide `typescript-language-server`. | ✅ | ✅ |
-| .NET SDK (LTS) | Only to provide `csharp-ls`. The LTS major is resolved at run time on Windows and WSL; macOS uses Microsoft's `dotnet-install.sh --channel LTS`, which names the policy directly. | ✅ | ✅ |
-| `rustup` | **Windows: opt-in, off by default** — pass `-WithRust`. Nothing else needs it there, since `rtk` is a prebuilt binary, and rustup's ~200 MB of downloads from `static.rust-lang.org` have been blocked outright by corporate filters reporting them as a trojan. On WSL and macOS it is still installed, because `cargo` builds `rtk` there. | ✅ | ✅ |
-| `typescript-language-server`, `csharp-ls`, `rust-analyzer` | The language servers the LSP plugins and `lsp-config.json` drive. On Windows, `rust-analyzer` comes only with `-WithRust`, and the config is written to match — no `rust-analyzer-lsp` in `enabledPlugins`, no `rust` entry in `lsp-config.json`. | ✅ | ✅ |
-
-#### Rust is opt-in on Windows
-
-A default Windows install downloads nothing from `static.rust-lang.org`, and the
-config it writes matches what it installed. Pass `-WithRust` to get the toolchain,
-`rust-analyzer`, and the Rust LSP wiring back:
-
-```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1))) -WithRust
-```
-
-WSL and macOS are unchanged — they still install Rust, because `cargo` is how
-`rtk` is built there.
-
-### What's in the global instructions
-
-`CLAUDE.md` / `copilot-instructions.md` are the same document, and it is short —
-four behavioural rules plus two notes:
-
-- **Think before coding** — state assumptions, surface multiple readings rather
-  than silently picking one, say so when a simpler approach exists.
-- **Simplicity first** — the minimum code that solves the problem; no
-  speculative features, abstractions or configurability.
-- **Surgical changes** — touch only what the request requires, match the
-  surrounding style, don't refactor what isn't broken, clean up only orphans
-  your own change created.
-- **Goal-driven execution** — turn the task into a verifiable goal and state a
-  short plan with a check per step.
-- **A reporting preference** — terse, outlined, no sycophancy.
-- **A pointer to `RTK.md`**, so the model knows its shell commands are being
-  rewritten and what the `rtk` meta commands are.
-
-The closing section is the only platform-specific part, and is swapped per
-platform: Git Bash's unstatic cwd on Windows, `/mnt/c` performance and
-`wslpath` on WSL.
-
-### Skills
-
-- **`graphify`** (Claude) — turns a codebase into a persistent, queryable
-  knowledge graph and answers architecture and file-relationship questions from
-  it instead of grepping. Shipped as a snapshot, then refreshed from your
-  installed `graphify` so the two versions match.
-- **`debug`** (Copilot) — drives the JetBrains IDE debugger to find the root
-  cause of a crash or unexpected runtime behaviour.
-
-### Plugins
-
-Enabled in `settings.json` and installed from `anthropics/claude-plugins-official`
-and `DietrichGebert/ponytail` — Copilot uses only the latter:
-
-| Plugin | What it does | Claude | Copilot |
-| --- | --- | :-: | :-: |
-| `ponytail` | "Forces the laziest solution that works. YAGNI, stdlib first, one line over fifty." Reinforces the simplicity rule above. | ✅ | ✅ |
-| `typescript-lsp` | TypeScript/JavaScript code intelligence. | ✅ | — |
-| `csharp-lsp` | C# code intelligence. | ✅ | — |
-| `rust-analyzer-lsp` | Rust code intelligence. | ✅ | — |
-
-Copilot gets the same three language servers through `lsp-config.json` rather
-than through plugins. Pass `-SkipPlugins` / `--skip-plugins` to skip this step
-entirely; the settings still enable them, so a first session would fetch them.
-
-## This runs remote code
-
-It is a script from the internet piped into your shell. Read it first — `irm`
-on its own prints it without running it:
-
-```powershell
-irm https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-claude-windows.ps1
-```
-
-### Pinning to a fixed version
-
-Two things carry a version, and **both** have to be pinned:
-
-1. the URL you fetch the bootstrap from, and
-2. `-Ref`, which decides the version of the repo the bootstrap downloads.
-
-Pinning only the URL does **not** pin the install — the bootstrap still defaults
-to `-Ref main` and would fetch the latest config. Pin both, to the same ref:
-
-```powershell
-$ref = "v1.0.0"   # a tag, branch or commit SHA
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/toperux/t4-ai-setup/$ref/install-claude-windows.ps1"))) -Ref $ref
-```
-
-Add any installer flags after `-Ref $ref`.
-
-The permissive Claude setting is covered under
-[Before you run it](#before-you-run-it); the per-tool READMEs go into more
-detail.
-
-## Repository layout
-
-```
-.gitattributes                 `* -text` — config files ship byte for byte
-.gitignore
-install-claude-windows.ps1     entry point, downloads this repo and runs the installer
-install-claude-wsl.sh
-install-claude-macos.sh
-install-copilot-windows.ps1
-install-copilot-wsl.sh
-install-copilot-macos.sh
-claude/
-  shared/                      config that is the same on every platform
-  windows/
-    setup-claude-windows.ps1   the installer
-    config/                    the Windows-only config
-  wsl/
-    setup-claude-wsl.sh
-    config/                    the WSL-only config
-  macos/
-    setup-claude-macos.sh
-    config/                    the macOS-only config
-copilot/                       same shape, same three platforms
-```
-
-The Windows bootstrap downloads a zip; the WSL and macOS ones download a
-tarball, because `tar` is everywhere while `unzip` often isn't — and unlike the
-zip, the tarball preserves the executable bit.
-
-Config is split into a platform-neutral `shared/` tree and a per-platform
-overlay, and the installer merges the two with the overlay winning. That keeps
-the portable ~85% of the config in one place rather than triplicated across the
-three platforms.
-
-The one file that is neither fully portable nor fully platform-specific — the
-global instructions — is **composed at install time** from
-`shared/CLAUDE.core.md` plus `windows/config/CLAUDE.append.md`. The two halves
-are a byte cut of the original file, joined byte for byte, so what lands in
-`~/.claude/CLAUDE.md` is exactly the original.
+| | Windows | WSL | macOS |
+| --- | --- | --- | --- |
+| Claude Code | [claude/README.md](claude/README.md) | [claude/wsl](claude/wsl/README.md) | [claude/macos](claude/macos/README.md) |
+| Copilot CLI | [copilot/README.md](copilot/README.md) | [copilot/wsl](copilot/wsl/README.md) | [copilot/macos](copilot/macos/README.md) |
 
 ## License
 
