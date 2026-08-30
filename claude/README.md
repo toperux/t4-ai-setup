@@ -55,7 +55,7 @@ merges them, with the overlay winning on a collision.
 | `windows/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, telemetry off, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`, `cd` and `pushd`. Wires up the hooks and statusline below, and enables the plugins — four with `-WithRust`, otherwise three, since `rust-analyzer-lsp` is removed for a no-Rust install. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse hook. Hard-blocks Read/Edit/Write on secret-ish files (exits 2), independent of the deny-rules — belt and braces. |
 | `shared/hooks/worktree_guard.py` | PreToolUse hook on Bash. Denies `git worktree add` anywhere outside `<cwd>/.claude/worktrees/` or `%TEMP%/claude/`, so worktrees stop landing in the workspace root or `C:\`. |
-| `windows/config/statusline-command.ps1` | Statusline: model name, context-usage bar, 5-hour and 7-day rate-limit bars, logged-in account email, current git branch. |
+| `windows/config/statusline-command.ps1` | Statusline: ponytail marker, reasoning effort, then capsule pills for model/context, 5-hour and 7-day rate limits, followed by the logged-in account email and current git branch. |
 | `shared/skills/graphify/` | The `graphify` skill — builds a queryable knowledge graph of a codebase — with its reference docs. Shipped as a snapshot, then refreshed by `graphify install --platform claude` so it matches the version actually installed. |
 | `shared/RTK.md` | How `rtk` (the token-optimizing CLI proxy) works and its meta commands (`rtk gain`, `rtk discover`, `rtk proxy`). |
 | `windows/setup-claude-windows.ps1` | The installer. |

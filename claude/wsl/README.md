@@ -60,7 +60,7 @@ the overlay winning on a collision.
 | `wsl/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`. Wires up the hooks and statusline below, and enables the four plugins. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse hook. Hard-blocks Read/Edit/Write on secret-ish files (exits 2), independent of the deny-rules — belt and braces. |
 | `shared/hooks/worktree_guard.py` | PreToolUse hook on Bash. Denies `git worktree add` outside the allowed roots, so worktrees stop landing in the workspace root. |
-| `wsl/config/statusline-command.sh` | Statusline: ponytail marker, model name, context-usage bar, 5-hour and 7-day rate-limit bars, account email, current git branch. Needs `python3` and `awk`. |
+| `wsl/config/statusline-command.sh` | Statusline: ponytail marker, reasoning effort, then capsule pills for model/context, 5-hour and 7-day rate limits, followed by account email and current git branch. Needs `python3`. |
 | `shared/skills/graphify/` | The `graphify` skill — builds a queryable knowledge graph of a codebase — with its reference docs. Shipped as a snapshot, then refreshed by `graphify install --platform claude` so it matches the version actually installed. |
 | `shared/RTK.md` | How `rtk` (the token-optimizing CLI proxy) works and its meta commands. |
 | `wsl/setup-claude-wsl.sh` | The installer. |
