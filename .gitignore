@@ -1,2 +1,5 @@
 # Packaged zips would drift from the repo they were built from.
 *.zip
+
+# Generated knowledge graph: derived from the tree, stale after any commit.
+graphify-out/
