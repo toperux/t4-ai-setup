@@ -61,8 +61,7 @@ the overlay winning on a collision.
 | `shared/hooks/worktree_guard.py` | PreToolUse on Bash. Denies `git worktree add` outside the allowed roots. |
 | `shared/hooks/graphify_hint.py` | PreToolUse on Bash/Grep/Glob. Suggests `graphify query` before a text search. |
 | `shared/hooks/graphify_update_notice.py` | PostToolUse on Edit/Write. Reminds you to run `graphify update .`. |
-| `shared/intellij-skills/debug/` | The `debug` skill. |
-| `wsl/config/hooks/copilot-hooks.json` | Registers the five hooks above. WSL-specific: every entry is keyed on `"bash"` and calls `python3 "$HOME/.copilot/hooks/…"`. |
+| `wsl/config/hooks/copilot-hooks.json` | Registers the five hooks above. WSL-specific: every entry is keyed on `"bash"` and calls `python3 "<copilot-dir>/hooks/…"`, rendered from `__COPILOT_HOME__` at install time so `--copilot-dir` is honoured. |
 | `wsl/config/hooks/rtk.json` | Routes shell commands through `rtk hook copilot`, also keyed on `"bash"`. |
 | `wsl/setup-copilot-wsl.sh` | The installer. |
 
@@ -76,7 +75,7 @@ accepts two conventions: **PascalCase** events take Claude-format matchers
 `view`, `edit`). Matching is case-sensitive and the matcher vocabulary follows
 the event's convention — so pairing a camelCase event with `Read|Edit|Write`,
 or a PascalCase one with `bash`, silently stops the hook firing. Carried over
-from the Windows overlay unchanged, and asserted by the test suite.
+from the Windows overlay unchanged.
 
 ### Why copilot-instructions.md is split
 
@@ -185,18 +184,3 @@ git -C ~/.copilot checkout <commit-before-the-backup> -- .
 ```
 
 The repo is local only and never pushed.
-
-## Test coverage
-
-64 assertions across this installer and the macOS one, run on a real WSL bash
-against the shipped script text: the composed instructions file (byte-identical
-to `core + append`, and pure CRLF), the retargeted hook config, an idempotent
-re-run, a config filename containing a space, the missing-overlay hard stop,
-files the package doesn't ship surviving, both backup branches including an
-existing repo reached through a symlink, and the macOS platform guard.
-
-The Homebrew and `dotnet-install.sh` paths belong to the macOS port. They are
-not covered by this run, but they are byte-identical to the Claude macOS
-installer's, which has been run on Apple Silicon hardware. The `copilot-cli`
-cask install remains unexercised — see
-[`../macos/README.md`](../macos/README.md).

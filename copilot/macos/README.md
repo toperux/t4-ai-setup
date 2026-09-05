@@ -64,8 +64,7 @@ with the overlay winning on a collision.
 | `shared/hooks/worktree_guard.py` | PreToolUse on Bash. Denies `git worktree add` outside the allowed roots. |
 | `shared/hooks/graphify_hint.py` | PreToolUse on Bash/Grep/Glob. Suggests `graphify query` before a text search. |
 | `shared/hooks/graphify_update_notice.py` | PostToolUse on Edit/Write. Reminds you to run `graphify update .`. |
-| `shared/intellij-skills/debug/` | The `debug` skill. |
-| `macos/config/hooks/copilot-hooks.json` | Registers the five hooks above, keyed on `"bash"` and calling `python3 "$HOME/.copilot/hooks/…"`. |
+| `macos/config/hooks/copilot-hooks.json` | Registers the five hooks above, keyed on `"bash"` and calling `python3 "<copilot-dir>/hooks/…"`, rendered from `__COPILOT_HOME__` at install time so `--copilot-dir` is honoured. |
 | `macos/config/hooks/rtk.json` | Routes shell commands through `rtk hook copilot`, also keyed on `"bash"`. |
 | `macos/setup-copilot-macos.sh` | The installer. |
 
@@ -220,8 +219,7 @@ What *has* been verified:
   directly.
 - Everything platform-neutral: the config merge, the composed
   `copilot-instructions.md`, the transactional swap and rollback, the backup
-  branches and the plugin matcher, all exercised against the real script text
-  with only the Darwin guard patched.
+  branches and the plugin matcher are shared with the WSL installer.
 - The `copilot-cli` cask exists at 1.0.80 and is a plain `binary` symlink, so it
   needs no password; `dot.net`'s `--channel LTS` and the Homebrew install script
   both resolve.

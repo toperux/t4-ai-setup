@@ -7,7 +7,7 @@ Config, plus the command-line tools that config depends on. The
 
 - **Claude Code** — writes 16 files into `~/.claude`: instructions, settings,
   two Python hooks, a statusline, the graphify skill.
-- **Copilot CLI** — writes 11 files into `~/.copilot`: instructions, settings,
+- **Copilot CLI** — writes 10 files into `~/.copilot`: instructions, settings,
   LSP config, five Python hooks, hook registrations.
 
 Neither installer upgrades a tool you already have; version policy only applies
@@ -108,7 +108,8 @@ four behavioural rules plus two notes:
 
 The closing section is the only platform-specific part, and is swapped per
 platform: Git Bash's unstatic cwd on Windows, `/mnt/c` performance and
-`wslpath` on WSL. How the two halves are joined is in
+`wslpath` on WSL, the BSD userland and bash 3.2 on macOS. How the two halves
+are joined is in
 [architecture.md](architecture.md#the-global-instructions-are-composed-at-install-time).
 
 ## Skills
@@ -117,8 +118,6 @@ platform: Git Bash's unstatic cwd on Windows, `/mnt/c` performance and
   knowledge graph and answers architecture and file-relationship questions from
   it instead of grepping. Shipped as a snapshot, then refreshed from your
   installed `graphify` so the two versions match.
-- **`debug`** (Copilot) — drives the JetBrains IDE debugger to find the root
-  cause of a crash or unexpected runtime behaviour.
 
 ## Plugins
 

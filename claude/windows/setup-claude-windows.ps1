@@ -141,7 +141,7 @@ function Add-UserPath {
     if ($segments -notcontains $Path) {
         [Environment]::SetEnvironmentVariable("Path", (($segments + $Path) -join ";"), "User")
     }
-    if ($env:Path -notlike "*$Path*") {
+    if (($env:Path -split ";") -notcontains $Path) {
         $env:Path = "$Path;$env:Path"
     }
 }
@@ -481,10 +481,16 @@ function Install-Toolchain {
             Write-Warning "alongside it - unlike the old 'cargo install --force', it cannot remove"
             Write-Warning "that one. If the wrong copy wins on PATH, the check at the end says so."
         }
-        Install-WingetPackage -Id "rtk-ai.rtk" -Command "rtk" -SkipPresenceCheck
-        Update-SessionPath
+        # Ask winget first: `winget install` on a package it already has exits
+        # non-zero ("no applicable upgrade"), which on a re-run would surface as
+        # a failed install and mask the real problem, the throw below.
+        Invoke-Native { & winget list --id rtk-ai.rtk --exact --source winget *> $null }
+        if ($LASTEXITCODE -ne 0) {
+            Install-WingetPackage -Id "rtk-ai.rtk" -Command "rtk" -SkipPresenceCheck
+            Update-SessionPath
+        }
         if (-not (Test-RtkIsTokenKiller)) {
-            throw "rtk installed but 'rtk gain' still fails - the wrong rtk is winning on PATH."
+            throw "rtk-ai.rtk is installed but 'rtk gain' still fails - the wrong rtk is winning on PATH."
         }
     }
 

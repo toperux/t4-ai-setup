@@ -5,25 +5,25 @@
       {
         "type": "command",
         "matcher": "Read|Edit|Write",
-        "bash": "python3 \"$HOME/.copilot/hooks/check_sensitive_files.py\"",
+        "bash": "python3 \"__COPILOT_HOME__/hooks/check_sensitive_files.py\"",
         "timeoutSec": 5
       },
       {
         "type": "command",
         "matcher": "Bash",
-        "bash": "python3 \"$HOME/.copilot/hooks/command_policy.py\"",
+        "bash": "python3 \"__COPILOT_HOME__/hooks/command_policy.py\"",
         "timeoutSec": 5
       },
       {
         "type": "command",
         "matcher": "Bash",
-        "bash": "python3 \"$HOME/.copilot/hooks/worktree_guard.py\"",
+        "bash": "python3 \"__COPILOT_HOME__/hooks/worktree_guard.py\"",
         "timeoutSec": 5
       },
       {
         "type": "command",
         "matcher": "Bash|Grep|Glob",
-        "bash": "python3 \"$HOME/.copilot/hooks/graphify_hint.py\"",
+        "bash": "python3 \"__COPILOT_HOME__/hooks/graphify_hint.py\"",
         "timeoutSec": 5
       }
     ],
@@ -31,7 +31,7 @@
       {
         "type": "command",
         "matcher": "Edit|Write",
-        "bash": "python3 \"$HOME/.copilot/hooks/graphify_update_notice.py\"",
+        "bash": "python3 \"__COPILOT_HOME__/hooks/graphify_update_notice.py\"",
         "timeoutSec": 5
       }
     ]

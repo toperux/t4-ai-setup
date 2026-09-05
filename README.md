@@ -162,7 +162,7 @@ curl -fsSL https://raw.githubusercontent.com/toperux/t4-ai-setup/main/install-cl
 
 - **Claude Code** — 16 files in `~/.claude`: instructions, settings, two Python
   hooks, a statusline, the graphify skill.
-- **Copilot CLI** — 11 files in `~/.copilot`: instructions, settings, LSP
+- **Copilot CLI** — 10 files in `~/.copilot`: instructions, settings, LSP
   config, five Python hooks, hook registrations.
 
 Plus the tools those settings need — `rtk`, `graphify`, `git`, Python, `jq`,

@@ -290,8 +290,8 @@ install_toolchain() {
       || warn "rtk installation failed. Remove hooks/rtk.json, or retry."
   fi
 
-  # graphify: backs the bundled debug skill's graph queries and the two graphify
-  # hooks. The PyPI package is spelled with two y's.
+  # graphify: backs the two graphify hooks. The PyPI package is spelled with two
+  # y's.
   if ! have graphify; then
     if have uv; then
       say "Installing graphify"
@@ -371,7 +371,7 @@ Install git (or re-run without --skip-toolchain), or pass --skip-backup to overw
                  "data.db" "data.db-shm" "data.db-wal" \
                  "session-store.db" "session-store.db-shm" "session-store.db-wal" \
                  "command-history-state.json" "vscode.session.metadata.cache.json" \
-                 ".DS_Store"; do
+                 "__pycache__/" ".DS_Store"; do
       grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
     done
   fi
@@ -448,9 +448,9 @@ copy_configuration() {
   }
   trap 'rollback' ERR
 
-  # Everything except the two composed halves. Unlike the Claude package there
-  # is no template step: settings.json and lsp-config.json hold no paths and no
-  # shell, so they are copied verbatim like every other file.
+  # Everything except the two composed halves. settings.json and lsp-config.json
+  # hold no paths and are copied verbatim; hooks/copilot-hooks.json is rendered
+  # in place below.
   #
   # `while read` rather than `for rel in $(...)`, so a config file whose name
   # contains a space is copied rather than split into two nonexistent paths.
@@ -465,6 +465,18 @@ copy_configuration() {
   core="$(resolve_source "$COMPOSED_CORE")"
   append="$(resolve_source "$COMPOSED_APPEND")"
   cat "$core" "$append" > "$staging/$COMPOSED_OUTPUT"
+
+  # copilot-hooks.json points at the hook scripts by absolute path, so it is
+  # rendered against the target directory. newline="" on both ends keeps its
+  # CRLF intact.
+  python3 - "$staging/hooks/copilot-hooks.json" "$COPILOT_DIR" <<'PY'
+import sys
+path, home = sys.argv[1:3]
+with open(path, encoding="utf-8", newline="") as f:
+    rendered = f.read().replace("__COPILOT_HOME__", home.rstrip("/"))
+with open(path, "w", encoding="utf-8", newline="") as f:
+    f.write(rendered)
+PY
 
   # The hooks are deliberately NOT made executable. They ship CRLF, like the
   # rest of this package, so `./hook.py` would fail with a
@@ -660,6 +672,9 @@ while IFS= read -r rel; do
       || die "$rel was installed but is not valid JSON." ;;
   esac
 done < <(installed_files)
+
+grep -q "__COPILOT_HOME__" "$COPILOT_DIR/hooks/copilot-hooks.json" \
+  && die "hooks/copilot-hooks.json still contains the __COPILOT_HOME__ placeholder."
 
 # The composed instructions file must stay pure CRLF: a bare LF would mean one
 # of the two halves was re-encoded somewhere between the repo and here.

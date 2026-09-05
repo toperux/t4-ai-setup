@@ -72,8 +72,9 @@ print("" if not lvl else "%s[2m%s%s[0m" % (E, {"medium": "med", "xhigh": "xhi"}.
 ')
 bars="${fields[0]}" dir="${fields[1]}" effort="${fields[2]}"
 
-# account email — regex, not a full parse (~/.claude.json is multi-MB)
-account=$(LC_ALL=C sed -n 's/.*"emailAddress"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ~/.claude.json 2>/dev/null | head -1)
+# account email — regex, not a full parse (~/.claude.json is multi-MB). Scoped
+# to the oauthAccount object: the file is pretty-printed, so a line range.
+account=$(LC_ALL=C sed -n '/"oauthAccount"/,/}/s/.*"emailAddress"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ~/.claude.json 2>/dev/null | head -1)
 
 # ponytail active-mode marker: a dot colored by intensity
 prefix=""

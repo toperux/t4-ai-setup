@@ -60,8 +60,7 @@ merges them, with the overlay winning on a collision.
 | `shared/hooks/worktree_guard.py` | PreToolUse on Bash. Denies `git worktree add` outside the allowed roots, so worktrees stop landing in the workspace root or `C:\`. |
 | `shared/hooks/graphify_hint.py` | PreToolUse on Bash/Grep/Glob. Suggests `graphify query` before a text search. |
 | `shared/hooks/graphify_update_notice.py` | PostToolUse on Edit/Write. Reminds you to run `graphify update .` so the graph stays current. |
-| `shared/intellij-skills/debug/` | The `debug` skill. |
-| `windows/config/hooks/copilot-hooks.json` | Registers the five hooks above. Windows-specific: every entry is keyed on `"powershell"` and uses `$env:USERPROFILE\...` paths. |
+| `windows/config/hooks/copilot-hooks.json` | Registers the five hooks above. Windows-specific: every entry is keyed on `"powershell"`. Hook paths are rendered from `__COPILOT_HOME__` at install time, so `-CopilotDirectory` is honoured. |
 | `windows/config/hooks/rtk.json` | Routes shell commands through `rtk hook copilot`. Also keyed on `"powershell"`. |
 | `windows/setup-copilot-windows.ps1` | The installer. |
 
@@ -131,7 +130,7 @@ If you already have the crates.io `rtk`, winget installs its own copy **alongsid
 it**; unlike the old `cargo install --force`, it cannot overwrite the other one.
 Which one wins is then a PATH question, and the two orders differ: the installer
 prepends to the session PATH but Windows appends to the persisted one, so
-`~\.cargoin` (often first) can shadow the winget shim in the next terminal you
+`~\.cargo\bin` (often first) can shadow the winget shim in the next terminal you
 open. The installer therefore ends by resolving `rtk` the way a **new** process
 will — Machine PATH then User PATH — and running `rtk gain` on *that* copy. If the
 wrong one would win, the run fails and names the file to delete, rather than
@@ -168,10 +167,10 @@ them):
 - **Transactional copy.** Everything is staged first and swapped in at the end.
   If any step fails midway, your previous config is restored rather than left
   half-replaced.
-- **Only shipped files are replaced.** `instructions/`, `prompts/` and `skills/`
-  ship empty; the installer enumerates *files*, never directories, so anything
-  you already have in those folders is left alone. (An earlier version replaced
-  whole directories and deleted them.)
+- **Only shipped files are replaced.** The installer enumerates *files*, never
+  directories, so anything you already have in `instructions/`, `prompts/` or
+  `skills/` is left alone. (An earlier version replaced whole directories and
+  deleted them.)
 - **Node.js is checksum-verified** against the SHA256 nodejs.org publishes.
 - **The backup repo is created in `~/.copilot` itself**, never a parent. If your
   home directory happens to be a git repo, this won't commit into it.

@@ -141,9 +141,13 @@ install_dotnet() {
   have_dotnet_sdk && return 0
   # Newest LTS first. 9.0 is deliberately skipped: it is STS, and the version
   # policy is LTS only.
+  #
+  # The package name doubles as install_pkg's command probe: `dotnet` itself
+  # would be found on a runtime-only machine and the install skipped, which is
+  # the case have_dotnet_sdk exists to catch.
   local v
   for v in 10.0 8.0; do
-    if install_pkg dotnet "dotnet-sdk-$v" 2>/dev/null && have_dotnet_sdk; then
+    if install_pkg "dotnet-sdk-$v" "dotnet-sdk-$v" 2>/dev/null && have_dotnet_sdk; then
       return 0
     fi
   done

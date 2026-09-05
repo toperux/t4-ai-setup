@@ -139,7 +139,7 @@ function Add-UserPath {
     if ($segments -notcontains $Path) {
         [Environment]::SetEnvironmentVariable("Path", (($segments + $Path) -join ";"), "User")
     }
-    if ($env:Path -notlike "*$Path*") {
+    if (($env:Path -split ";") -notcontains $Path) {
         $env:Path = "$Path;$env:Path"
     }
 }
@@ -371,7 +371,7 @@ function Test-RtkIsTokenKiller {
 #
 # Test-RtkIsTokenKiller only proves the rtk that wins in THIS session works, and
 # the two orders are not the same - Add-UserPath prepends to the session PATH but
-# appends to the persisted one. So a machine with the wrong rtk in ~\.cargoin
+# appends to the persisted one. So a machine with the wrong rtk in ~\.cargo\bin
 # (index 0 of the User PATH on the machine this was found on, against index 18
 # for WinGet\Links) passes the in-session check and still breaks the shell hook
 # in the terminal the user actually opens next. winget cannot remove that copy
@@ -443,10 +443,16 @@ function Install-Toolchain {
             Write-Warning "alongside it - unlike the old 'cargo install --force', it cannot remove"
             Write-Warning "that one. If the wrong copy wins on PATH, the check at the end says so."
         }
-        Install-WingetPackage -Id "rtk-ai.rtk" -Command "rtk" -SkipPresenceCheck
-        Update-SessionPath
+        # Ask winget first: `winget install` on a package it already has exits
+        # non-zero ("no applicable upgrade"), which on a re-run would surface as
+        # a failed install and mask the real problem, the throw below.
+        Invoke-Native { & winget list --id rtk-ai.rtk --exact --source winget *> $null }
+        if ($LASTEXITCODE -ne 0) {
+            Install-WingetPackage -Id "rtk-ai.rtk" -Command "rtk" -SkipPresenceCheck
+            Update-SessionPath
+        }
         if (-not (Test-RtkIsTokenKiller)) {
-            throw "rtk installed but 'rtk gain' still fails - the wrong rtk is winning on PATH."
+            throw "rtk-ai.rtk is installed but 'rtk gain' still fails - the wrong rtk is winning on PATH."
         }
     }
 
@@ -589,7 +595,8 @@ function Backup-CopilotDirectory {
             "logs/", "ide/", "run/", "restart/", "media-cache/",
             "data.db", "data.db-shm", "data.db-wal",
             "session-store.db", "session-store.db-shm", "session-store.db-wal",
-            "command-history-state.json", "vscode.session.metadata.cache.json"
+            "command-history-state.json", "vscode.session.metadata.cache.json",
+            "__pycache__/"
         )
         if (-not (Test-Path $gitignore)) {
             Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")
@@ -730,8 +737,20 @@ function Copy-CopilotConfiguration {
             Copy-Item -LiteralPath $map[$relativePath] -Destination $staged -Force
         }
 
-        # Post-process the staged copy rather than special-casing it in the loop
-        # above, so the plain copy stays the one path every shipped file takes.
+        # Post-process the staged copies rather than special-casing them in the
+        # loop above, so the plain copy stays the one path every shipped file
+        # takes.
+        #
+        # copilot-hooks.json points at the hook scripts by absolute path.
+        # Forward slashes: PowerShell accepts them, and they need no JSON
+        # escaping.
+        $hooksConfig = Join-Path $stagingRoot "hooks\copilot-hooks.json"
+        if (Test-Path $hooksConfig) {
+            $forwardSlashHome = $targetPath.TrimEnd("\").Replace("\", "/")
+            Write-TextFile -Path $hooksConfig `
+                           -Content ([IO.File]::ReadAllText($hooksConfig).Replace("__COPILOT_HOME__", $forwardSlashHome))
+        }
+
         if (-not $WithRust) {
             $lspConfig = Join-Path $stagingRoot "lsp-config.json"
             if (Test-Path $lspConfig) {
@@ -1008,6 +1027,10 @@ foreach ($relativePath in (Get-InstalledFiles (Get-ShippedFileMap))) {
             throw "$relativePath was installed but is not valid JSON: $_"
         }
     }
+}
+
+if ((Get-Content (Join-Path $CopilotDirectory "hooks\copilot-hooks.json") -Raw) -match "__COPILOT_HOME__") {
+    throw "hooks\copilot-hooks.json still contains the __COPILOT_HOME__ placeholder."
 }
 
 Write-Host ""

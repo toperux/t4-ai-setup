@@ -122,15 +122,15 @@ missing. Most track latest automatically: `git`, `uv`, `jq`, `graphify`,
 `-WithRust`, Rust (rustup stable). Node.js resolves the newest LTS from the live
 release feed at run time.
 
-Two are pinned and need a human bump eventually — override with a flag if you
+One is pinned and needs a human bump eventually — override with a flag if you
 want something else:
 
 | Pin | Flag | Why |
 | --- | --- | --- |
 | Python 3.14 | `-PythonVersion` | Latest stable minor. Revisit when 3.15 ships. |
 
-.NET is no longer pinned — the newest LTS still in active or maintenance
-support is resolved at run time from Microsoft's official releases index.
+.NET is not pinned — the newest LTS still in active or maintenance support is
+resolved at run time from Microsoft's official releases index.
 
 ### ⚠️ The `rtk` name collision
 
@@ -153,7 +153,7 @@ If you already have the crates.io `rtk`, winget installs its own copy **alongsid
 it**; unlike the old `cargo install --force`, it cannot overwrite the other one.
 Which one wins is then a PATH question, and the two orders differ: the installer
 prepends to the session PATH but Windows appends to the persisted one, so
-`~\.cargoin` (often first) can shadow the winget shim in the next terminal you
+`~\.cargo\bin` (often first) can shadow the winget shim in the next terminal you
 open. The installer therefore ends by resolving `rtk` the way a **new** process
 will — Machine PATH then User PATH — and running `rtk gain` on *that* copy. If the
 wrong one would win, the run fails and names the file to delete, rather than

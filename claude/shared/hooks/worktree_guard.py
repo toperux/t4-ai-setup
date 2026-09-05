@@ -43,8 +43,10 @@ def under(target, root):
 
 def targets(command):
     """Target path of each `git worktree add` in the command; None if unparseable."""
+    # Non-POSIX on Windows: POSIX mode eats backslashes, so C:\a\b becomes C:ab.
+    # It keeps the quotes, hence the strip on the target below.
     try:
-        toks = shlex.split(command, posix=True)
+        toks = shlex.split(command, posix=os.name != "nt")
     except ValueError:
         toks = command.split()
     found = []
@@ -61,7 +63,7 @@ def targets(command):
                 j += 1
                 continue
             break
-        found.append(toks[j] if j < len(toks) else None)
+        found.append(toks[j].strip("\"'") if j < len(toks) else None)
     return found
 
 
