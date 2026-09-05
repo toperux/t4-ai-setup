@@ -620,7 +620,9 @@ function Backup-ClaudeDirectory {
             ".credentials.json", ".claude-setup-staging-*", ".claude-setup-backup-*",
             "downloads/", "projects/", "shell-snapshots/", "session-env/",
             "file-history/", "cache/", "plugins/", "paste-cache/", "backups/",
-            "history.jsonl", "stats-cache.json"
+            "history.jsonl", "stats-cache.json",
+            "daemon/", "daemon.log", "sessions/", "tasks/", "jobs/", "*.bak",
+            ".last-*", ".in_use/"
         )
         if (-not (Test-Path $gitignore)) {
             Write-TextFile -Path $gitignore -Content (($ignoreEntries -join "`n") + "`n")

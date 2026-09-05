@@ -361,7 +361,9 @@ Install git (or re-run without --skip-toolchain), or pass --skip-backup to overw
     for entry in ".credentials.json" ".claude-setup-staging-*" ".claude-setup-backup-*" \
                  "downloads/" "projects/" "shell-snapshots/" "session-env/" \
                  "file-history/" "cache/" "plugins/" "paste-cache/" "backups/" \
-                 "history.jsonl" "stats-cache.json" ".DS_Store"; do
+                 "history.jsonl" "stats-cache.json" \
+                 "daemon/" "daemon.log" "sessions/" "tasks/" "jobs/" "*.bak" \
+                 ".last-*" ".in_use/" ".DS_Store"; do
       grep -qxF "$entry" "$gitignore" 2>/dev/null || echo "$entry" >> "$gitignore"
     done
   fi
