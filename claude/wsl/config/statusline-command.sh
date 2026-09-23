@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Code status line — port of the Windows statusline-command.ps1
-# Shows: ponytail marker, model/context pill, 5h pill, 7d pill, account, git branch
+# Shows: ponytail marker, cache timer, effort, model/context pill, 5h pill, 7d pill, cost, account, git branch
 # Portable: bash 3.2 (macOS) and bash 5 (Linux/WSL). Needs python3.
 
 input=$(cat)
@@ -12,7 +12,7 @@ BRANCH_GLYPH=$(printf '⎇')  # branch glyph (U+2387)
 # are formatted here so the script needs no GNU date.
 fields=()
 while IFS= read -r _l; do fields+=("$_l"); done < <(printf '%s' "$input" | python3 -c '
-import json, sys
+import json, math, re, sys, time
 from datetime import datetime
 try: d = json.load(sys.stdin)
 except Exception: d = {}
@@ -44,7 +44,9 @@ def pill(label, pct, width):
     return ("%s[38;5;%dm▐%s" % (E, capL, r) + on + t[:filled] + r
             + off + t[filled:] + r + "%s[38;5;%dm▌%s" % (E, capR, r))
 
-pills = [(g("model", "display_name") or "unknown", g("context_window", "used_percentage"))]
+# "Opus 5.5 (1M context)" -> "O5.5"
+model = re.sub(r"^(\w)\w*\s+", r"\1", re.sub(r"\s*\(.*\)", "", g("model", "display_name") or "unknown"))
+pills = [(model, g("context_window", "used_percentage"))]
 
 five = g("rate_limits", "five_hour", "used_percentage")
 if five is not None:
@@ -66,11 +68,24 @@ width = max(len(pill_text(l, p)) for l, p in pills)
 print(" ".join(pill(l, p, width) for l, p in pills))
 print(g("workspace", "current_dir") or "")
 
+# prompt cache countdown from prompt_cache.expires_at; space after glyph (renders double-width)
+exp = g("prompt_cache", "expires_at")
+left = "--"
+if exp is not None:
+    rem = exp - time.time()
+    left = "%dm" % math.ceil(rem / 60) if rem > 0 and g("prompt_cache", "warm") else "cold"
+parts = ["%s[2m⏱ %s%s[0m" % (E, left, E)]
 # reasoning effort; absent on models that do not support it
 lvl = g("effort", "level")
-print("" if not lvl else "%s[2m%s%s[0m" % (E, {"medium": "med", "xhigh": "xhi"}.get(lvl, lvl), E))
+if lvl:
+    parts.append("%s[2m%s%s[0m" % (E, {"medium": "med", "xhigh": "xhi"}.get(lvl, lvl), E))
+print(" ".join(parts))
+
+# session cost
+cost = g("cost", "total_cost_usd")
+print("" if cost is None else "%s[2;38;5;180m$%.2f%s[0m" % (E, cost, E))
 ')
-bars="${fields[0]}" dir="${fields[1]}" effort="${fields[2]}"
+bars="${fields[0]}" dir="${fields[1]}" effort="${fields[2]}" cost="${fields[3]}"
 
 # account email — regex, not a full parse (~/.claude.json is multi-MB). Scoped
 # to the oauthAccount object: the file is pretty-printed, so a line range.
@@ -89,7 +104,9 @@ fi
 
 line="$prefix$effort$bars"
 
-[ -n "$account" ] && line="$line ${ESC}[2m$account${ESC}[0m"
+[ -n "$cost" ] && line="$line $cost"
+
+[ -n "$account" ] && line="$line ${ESC}[2m${account%%@*}${ESC}[0m"
 
 branch=$(git -C "${dir:-.}" branch --show-current 2>/dev/null)
 [ -n "$branch" ] || branch=$(git -C "${dir:-.}" rev-parse --short HEAD 2>/dev/null)

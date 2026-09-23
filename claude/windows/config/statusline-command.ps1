@@ -23,14 +23,23 @@ if (Test-Path $cfg) {
     }
 }
 
-$model = $json.model.display_name
+# "Opus 5.5 (1M context)" -> "O5.5"
+$model = $json.model.display_name -replace '\s*\(.*\)' -replace '^(\w)\w*\s+', '$1'
 $used = $json.context_window.used_percentage
 
 # reasoning effort; absent on models that don't support it
 $effort = ""
+# prompt cache countdown from prompt_cache.expires_at; space after glyph (renders double-width)
+$pc = $json.prompt_cache
+$left = "--"
+if ($null -ne $pc.expires_at) {
+    $rem = $pc.expires_at - [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $left = if ($rem -gt 0 -and $pc.warm) { "$([Math]::Ceiling($rem / 60))m" } else { "cold" }
+}
+$effort = "${Esc}[2m$([char]0x23F1) $left${Esc}[0m "
 if ($json.effort.level) {
     $short = switch ($json.effort.level) { "medium" { "med" } "xhigh" { "xhi" } default { $json.effort.level } }
-    $effort = "${Esc}[2m$short${Esc}[0m "
+    $effort += "${Esc}[2m$short${Esc}[0m "
 }
 
 # capsule bar: label + percent painted on a solid background, filled left-to-right
@@ -88,8 +97,14 @@ $width = ($pills | ForEach-Object { (Get-PillText $_[0] $_[1]).Length } | Measur
 $bars = ($pills | ForEach-Object { Get-Pill $_[0] $_[1] $width }) -join " "
 [Console]::Write("$prefix$effort$bars")
 
+# session cost
+$cost = $json.cost.total_cost_usd
+if ($null -ne $cost) {
+    [Console]::Write(" ${Esc}[2;38;5;180m`$$(([double]$cost).ToString("F2", [Globalization.CultureInfo]::InvariantCulture))${Esc}[0m")
+}
+
 if ($account) {
-    [Console]::Write(" ${Esc}[2m$account${Esc}[0m")
+    [Console]::Write(" ${Esc}[2m$($account.Split('@')[0])${Esc}[0m")
 }
 
 # git branch (falls back to short SHA on detached HEAD; silent if not a repo)

@@ -4,7 +4,6 @@
     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
     "DISABLE_TELEMETRY": "1",
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "60",
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "permissions": {
@@ -27,7 +26,8 @@
       "Edit(**/appsettings.*.json)",
       "Edit(**/web.config)",
       "Edit(**/local.settings.json)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git * push *)"
     ],
     "defaultMode": "auto"
   },
@@ -75,7 +75,8 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash \"__CLAUDE_HOME__/statusline-command.sh\""
+    "command": "bash \"__CLAUDE_HOME__/statusline-command.sh\"",
+    "refreshInterval": 60
   },
   "enabledPlugins": {
     "ponytail@ponytail": true,
@@ -89,10 +90,33 @@
         "source": "github",
         "repo": "DietrichGebert/ponytail"
       }
+    },
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      }
     }
   },
   "spinnerTipsEnabled": false,
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "low"
+    },
+    "claude-fable-5": {
+      "effortLevel": "high"
+    },
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    }
+  },
   "autoCompactWindow": 600000,
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
