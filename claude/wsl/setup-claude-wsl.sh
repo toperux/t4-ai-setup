@@ -5,6 +5,7 @@
 #
 #   bash setup-claude-wsl.sh
 #   bash setup-claude-wsl.sh --skip-toolchain --skip-plugins
+#   bash setup-claude-wsl.sh --with-model-routing
 #
 # Version policy - nothing already installed is upgraded; these apply only when
 # a command is missing. git, jq, curl, python3 and Node come from the distro;
@@ -20,6 +21,11 @@ CLAUDE_DIR="$HOME/.claude"
 SKIP_TOOLCHAIN=0
 SKIP_PLUGINS=0
 SKIP_BACKUP=0
+# Model routing is opt-in (--with-model-routing): it names specific models and
+# prices, which is a personal choice rather than a baseline. When set, this root
+# appends the "# Model routing" section to CLAUDE.md and installs the
+# coder/finder/scribe/tester agents it routes to. Empty means off.
+ROUTING_SOURCE=""
 
 # CLAUDE.md is assembled at install time from a platform-neutral core plus a
 # per-platform appendix, so the ~70 shared lines are not duplicated across the
@@ -28,16 +34,20 @@ SKIP_BACKUP=0
 COMPOSED_OUTPUT="CLAUDE.md"
 COMPOSED_CORE="CLAUDE.core.md"
 COMPOSED_APPEND="CLAUDE.append.md"
+# With --with-model-routing a third part, starting with its own blank line, is
+# appended after the two halves.
+COMPOSED_ROUTING="CLAUDE.model-routing.md"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-toolchain) SKIP_TOOLCHAIN=1 ;;
     --skip-plugins)   SKIP_PLUGINS=1 ;;
     --skip-backup)    SKIP_BACKUP=1 ;;
+    --with-model-routing) ROUTING_SOURCE="$SCRIPT_DIR/../optional/model-routing" ;;
     --shared-source)  SHARED_SOURCE="${2:?--shared-source requires a path}"; shift ;;
     --config-source)  CONFIG_SOURCE="${2:?--config-source requires a path}"; shift ;;
     --claude-dir)     CLAUDE_DIR="${2:?--claude-dir requires a path}"; shift ;;
-    -h|--help)        sed -n '3,8p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
+    -h|--help)        sed -n '3,9p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -55,9 +65,13 @@ have() { command -v "$1" >/dev/null 2>&1; }
 [ -d "$CONFIG_SOURCE" ] || die "Platform config source not found: $CONFIG_SOURCE"
 SHARED_SOURCE="$(cd "$SHARED_SOURCE" && pwd)"
 CONFIG_SOURCE="$(cd "$CONFIG_SOURCE" && pwd)"
+if [ -n "$ROUTING_SOURCE" ]; then
+  [ -d "$ROUTING_SOURCE" ] || die "Model routing source not found: $ROUTING_SOURCE"
+  ROUTING_SOURCE="$(cd "$ROUTING_SOURCE" && pwd)"
+fi
 mkdir -p "$CLAUDE_DIR"
 CLAUDE_DIR="$(cd "$CLAUDE_DIR" && pwd)"
-for root in "$SHARED_SOURCE" "$CONFIG_SOURCE"; do
+for root in "$SHARED_SOURCE" "$CONFIG_SOURCE" ${ROUTING_SOURCE:+"$ROUTING_SOURCE"}; do
   [ "$root" != "$CLAUDE_DIR" ] || die "The config source must not be the destination directory."
   case "$root" in "$CLAUDE_DIR"/*)
     die "The config source must not live inside the destination ($CLAUDE_DIR)." ;;
@@ -349,35 +363,44 @@ Install git (or re-run without --skip-toolchain), or pass --skip-backup to overw
 
 # Every file the package ships, as paths relative to a config root. Two roots
 # are merged - the platform-neutral `shared` tree and the per-platform overlay -
-# with the overlay winning on a collision. Enumerating rather than hardcoding
+# with the overlay winning on a collision. --with-model-routing adds
+# optional/model-routing as a third root. Enumerating rather than hardcoding
 # means a file added to either tree is picked up automatically, and anything NOT
 # shipped - your own hooks, your own skills - is simply left alone.
 shipped_files() {
   {
     (cd "$SHARED_SOURCE" && find . -type f | sed 's|^\./||')
     (cd "$CONFIG_SOURCE" && find . -type f | sed 's|^\./||')
+    if [ -n "$ROUTING_SOURCE" ]; then
+      (cd "$ROUTING_SOURCE" && find . -type f | sed 's|^\./||')
+    fi
   } | sort -u
 }
 
 # Resolve a relative path to its absolute source, overlay winning.
 resolve_source() {
-  if [ -f "$CONFIG_SOURCE/$1" ]; then printf '%s' "$CONFIG_SOURCE/$1"
+  if [ -n "$ROUTING_SOURCE" ] && [ -f "$ROUTING_SOURCE/$1" ]; then printf '%s' "$ROUTING_SOURCE/$1"
+  elif [ -f "$CONFIG_SOURCE/$1" ]; then printf '%s' "$CONFIG_SOURCE/$1"
   else printf '%s' "$SHARED_SOURCE/$1"; fi
 }
 
-# What actually lands in ~/.claude: everything shipped, minus the two halves of
-# the composed file, plus the composed file itself.
+# What actually lands in ~/.claude: everything shipped, minus the parts of the
+# composed file, plus the composed file itself.
 installed_files() {
-  shipped_files | grep -vxF -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND"
+  shipped_files | grep -vxF -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND" -e "$COMPOSED_ROUTING"
   printf '%s\n' "$COMPOSED_OUTPUT"
 }
 
 copy_configuration() {
-  local rel core append
+  local rel core append routing=""
   for rel in "$COMPOSED_CORE" "$COMPOSED_APPEND"; do
     [ -f "$(resolve_source "$rel")" ] \
       || die "The platform overlay is incomplete: $rel was not found under $SHARED_SOURCE or $CONFIG_SOURCE."
   done
+  if [ -n "$ROUTING_SOURCE" ]; then
+    routing="$ROUTING_SOURCE/$COMPOSED_ROUTING"
+    [ -f "$routing" ] || die "--with-model-routing was passed but $COMPOSED_ROUTING was not found under $ROUTING_SOURCE."
+  fi
   [ -f "$(resolve_source settings.json)" ] || die "settings.json was not found in either config source."
 
   # Stage everything first, then swap it in, so a failure midway leaves the
@@ -415,12 +438,13 @@ copy_configuration() {
     [ -n "$rel" ] || continue
     mkdir -p "$staging/$(dirname "$rel")"
     cp "$(resolve_source "$rel")" "$staging/$rel"
-  done < <(shipped_files | grep -vxF -e settings.json -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND")
+  done < <(shipped_files | grep -vxF -e settings.json -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND" -e "$COMPOSED_ROUTING")
 
-  # CLAUDE.md is the two halves joined byte for byte.
+  # CLAUDE.md is the two halves joined byte for byte, plus the model routing
+  # part when --with-model-routing is set.
   core="$(resolve_source "$COMPOSED_CORE")"
   append="$(resolve_source "$COMPOSED_APPEND")"
-  cat "$core" "$append" > "$staging/$COMPOSED_OUTPUT"
+  cat "$core" "$append" ${routing:+"$routing"} > "$staging/$COMPOSED_OUTPUT"
 
   # settings.json is rendered from the template.
   python3 - "$(resolve_source settings.json)" "$staging/settings.json" "$CLAUDE_DIR" <<'PY'

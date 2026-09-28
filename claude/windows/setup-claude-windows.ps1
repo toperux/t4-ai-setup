@@ -12,6 +12,9 @@ Installs the Claude Code user-level setup: CLI prerequisites plus the bundled
 .EXAMPLE
 .\setup-claude-windows.ps1 -WithRust
 
+.EXAMPLE
+.\setup-claude-windows.ps1 -WithModelRouting
+
 .NOTES
 Rust is opt-in. By default no Rust toolchain is installed at all: rtk comes from
 winget as a prebuilt binary, and rust-analyzer and its plugin are skipped, so
@@ -60,7 +63,13 @@ param(
     # blocked outright by corporate filters reporting them as a trojan. Passing
     # this adds rustup + the stable toolchain, the rust-analyzer component, and
     # the rust-analyzer-lsp plugin, and keeps that plugin in settings.json.
-    [switch]$WithRust
+    [switch]$WithRust,
+
+    # Opt in to model routing. Off by default: it names specific models and
+    # prices, which is a personal choice rather than a baseline. Passing this
+    # appends the "# Model routing" section to CLAUDE.md and installs the
+    # coder/finder/scribe/tester agents it routes to, from ..\optional\model-routing.
+    [switch]$WithModelRouting
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,7 +78,12 @@ $script:RestartRequired = $false
 $sharedPath = (Resolve-Path $SharedSource).Path
 $sourcePath = (Resolve-Path $ConfigSource).Path
 $targetPath = [IO.Path]::GetFullPath($ClaudeDirectory)
-foreach ($root in @($sharedPath, $sourcePath)) {
+$sourceRoots = @($sharedPath, $sourcePath)
+if ($WithModelRouting) {
+    $routingPath = (Resolve-Path (Join-Path $PSScriptRoot "..\optional\model-routing")).Path
+    $sourceRoots += $routingPath
+}
+foreach ($root in $sourceRoots) {
     if ($root.TrimEnd("\") -eq $targetPath.TrimEnd("\")) {
         throw "The config source must not be the destination .claude directory."
     }
@@ -80,10 +94,13 @@ foreach ($root in @($sharedPath, $sourcePath)) {
 # Windows, WSL and macOS overlays. The two halves are a byte cut of the original
 # file, so a raw byte concatenation reproduces it exactly - no re-encoding and
 # no line-ending normalisation (this file is LF; the Copilot one is CRLF).
+# With -WithModelRouting a third part, starting with its own blank line, is
+# appended after the two halves.
 $ComposedFile = @{
-    Output = "CLAUDE.md"
-    Core   = "CLAUDE.core.md"
-    Append = "CLAUDE.append.md"
+    Output  = "CLAUDE.md"
+    Core    = "CLAUDE.core.md"
+    Append  = "CLAUDE.append.md"
+    Routing = "CLAUDE.model-routing.md"
 }
 
 # $ErrorActionPreference = "Stop" makes PowerShell treat ANY native-command
@@ -668,12 +685,13 @@ function Backup-ClaudeDirectory {
 
 # Every file the package ships, as a map of relative path -> absolute source.
 # Two roots are merged - the platform-neutral `shared` tree and the per-platform
-# overlay - with the overlay winning on a collision. Enumerating rather than
+# overlay - with the overlay winning on a collision. -WithModelRouting adds
+# optional\model-routing as a third root. Enumerating rather than
 # hardcoding means a file added to either tree is picked up automatically, and
 # anything NOT shipped - your own hooks, your own skills - is simply left alone.
 function Get-ShippedFileMap {
     $map = [ordered]@{}
-    foreach ($root in @($sharedPath, $sourcePath)) {
+    foreach ($root in $sourceRoots) {
         foreach ($file in (Get-ChildItem -LiteralPath $root -Recurse -File)) {
             $map[$file.FullName.Substring($root.Length).TrimStart("\")] = $file.FullName
         }
@@ -681,12 +699,12 @@ function Get-ShippedFileMap {
     return $map
 }
 
-# What actually lands in ~/.claude: everything shipped, minus the two halves of
-# the composed file, plus the composed file itself.
+# What actually lands in ~/.claude: everything shipped, minus the parts of the
+# composed file, plus the composed file itself.
 function Get-InstalledFiles {
     param([Parameter(Mandatory)]$Map)
     return @(@($Map.Keys | Where-Object {
-        $_ -ne $ComposedFile.Core -and $_ -ne $ComposedFile.Append
+        $_ -ne $ComposedFile.Core -and $_ -ne $ComposedFile.Append -and $_ -ne $ComposedFile.Routing
     }) + $ComposedFile.Output)
 }
 
@@ -739,12 +757,16 @@ function Copy-ClaudeConfiguration {
             throw "The platform overlay is incomplete: $required was not found under $SharedSource or $ConfigSource."
         }
     }
+    if ($WithModelRouting -and -not $map.Contains($ComposedFile.Routing)) {
+        throw "-WithModelRouting was passed but $($ComposedFile.Routing) was not found under $routingPath."
+    }
 
     # settings.json is rendered from a template and CLAUDE.md is composed from
-    # its two halves; both are written straight into staging, so neither takes
+    # its parts; both are written straight into staging, so neither takes
     # part in the plain copy below.
     $shipped = @($map.Keys | Where-Object {
-        $_ -ne "settings.json" -and $_ -ne $ComposedFile.Core -and $_ -ne $ComposedFile.Append
+        $_ -ne "settings.json" -and $_ -ne $ComposedFile.Core -and $_ -ne $ComposedFile.Append -and
+        $_ -ne $ComposedFile.Routing
     })
     if (-not $shipped) {
         throw "No files found under $SharedSource or $ConfigSource - nothing to install."
@@ -777,11 +799,14 @@ function Copy-ClaudeConfiguration {
         }
         Write-TextFile -Path (Join-Path $stagingRoot "settings.json") -Content $rendered
 
-        # CLAUDE.md is the two halves joined byte for byte.
-        [IO.File]::WriteAllBytes(
-            (Join-Path $stagingRoot $ComposedFile.Output),
-            ([IO.File]::ReadAllBytes($map[$ComposedFile.Core]) +
-             [IO.File]::ReadAllBytes($map[$ComposedFile.Append])))
+        # CLAUDE.md is the two halves joined byte for byte, plus the model
+        # routing part when -WithModelRouting put it in the map.
+        $composed = [IO.File]::ReadAllBytes($map[$ComposedFile.Core]) +
+                    [IO.File]::ReadAllBytes($map[$ComposedFile.Append])
+        if ($map.Contains($ComposedFile.Routing)) {
+            $composed += [IO.File]::ReadAllBytes($map[$ComposedFile.Routing])
+        }
+        [IO.File]::WriteAllBytes((Join-Path $stagingRoot $ComposedFile.Output), $composed)
 
         foreach ($relativePath in $shipped) {
             $staged = Join-Path $stagingRoot $relativePath

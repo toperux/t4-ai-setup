@@ -35,6 +35,7 @@ Flags (to pass these through the one-liner, see the
 | Flag | Effect |
 | --- | --- |
 | `-WithRust` | Install Rust: rustup + the stable toolchain, `rust-analyzer`, and the `rust-analyzer-lsp` plugin. Off by default — see [Rust is opt-in](#rust-is-opt-in). |
+| `-WithModelRouting` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it drops the section from `CLAUDE.md`; the agents stay. |
 | `-SkipToolchain` | Only copy the config; install no tools. |
 | `-SkipPlugins` | Skip the `claude plugin` installs. |
 | `-SkipBackup` | Don't git-commit `~/.claude` first. Overwrites with no undo path. Only needed if you're running `-SkipToolchain` on a machine without git. |

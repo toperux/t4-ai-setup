@@ -112,6 +112,12 @@ platform: Git Bash's unstatic cwd on Windows, `/mnt/c` performance and
 are joined is in
 [architecture.md](architecture.md#the-global-instructions-are-composed-at-install-time).
 
+Model routing is opt-in on Claude: `-WithModelRouting` (Windows) or
+`--with-model-routing` (WSL, macOS) appends a `# Model routing` section to
+`CLAUDE.md` and installs the `coder`, `finder`, `scribe` and `tester` agents it
+routes to. Re-running without the flag drops the section from `CLAUDE.md`; the
+agents stay.
+
 ## Skills
 
 - **`graphify`** (Claude) — turns a codebase into a persistent, queryable

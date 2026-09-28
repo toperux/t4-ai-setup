@@ -47,7 +47,9 @@ The one file that is neither fully portable nor fully platform-specific — the
 global instructions — is **composed at install time** from
 `shared/CLAUDE.core.md` plus `windows/config/CLAUDE.append.md`. The two halves
 are a byte cut of the original file, joined byte for byte, so what lands in
-`~/.claude/CLAUDE.md` is exactly the original.
+`~/.claude/CLAUDE.md` is exactly the original. With `-WithModelRouting` /
+`--with-model-routing`, a third part, `optional/model-routing/CLAUDE.model-routing.md`,
+is appended after the two halves and the agents beside it are installed.
 
 Each per-tool README explains the cut for its own platform — see
 [Why CLAUDE.md is split](../claude/README.md#why-claudemd-is-split).

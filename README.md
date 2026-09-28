@@ -169,6 +169,10 @@ Plus the tools those settings need — `rtk`, `graphify`, `git`, Python, `jq`,
 Node.js, the .NET SDK and three language servers — each installed only if it is
 missing. On Windows, Rust is opt-in: pass `-WithRust`.
 
+Claude model routing (a `CLAUDE.md` section plus four agents) is opt-in: pass
+`-WithModelRouting` / `--with-model-routing`. Re-running without it drops the
+section from `CLAUDE.md`; the agents stay.
+
 ## Documentation
 
 | | |

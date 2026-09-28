@@ -43,6 +43,7 @@ Idempotent — safe to re-run. Anything already installed is skipped.
 | `--skip-toolchain` | Only copy the config; install no tools. |
 | `--skip-plugins` | Skip the `claude plugin` installs. |
 | `--skip-backup` | Don't git-commit `~/.claude` first. Overwrites with no undo path. Only needed if you're running `--skip-toolchain` on a machine without git. |
+| `--with-model-routing` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it drops the section from `CLAUDE.md`; the agents stay. |
 | `--claude-dir <path>` | Write the config somewhere other than `~/.claude`. |
 | `--shared-source <path>` | The platform-neutral config tree (default `../shared`). |
 | `--config-source <path>` | The platform overlay (default `./config`). |
