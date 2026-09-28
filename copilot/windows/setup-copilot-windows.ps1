@@ -308,10 +308,13 @@ function Install-NodeJsLts {
         return
     }
 
-    $architecture = switch ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
-        "X64" { "x64" }
-        "Arm64" { "arm64" }
-        default { throw "Node.js LTS is not available for this architecture." }
+    # The registry holds the native OS arch; RuntimeInformation.OSArchitecture
+    # on Windows PowerShell 5.1 can report the process arch instead.
+    $nativeArch = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment").PROCESSOR_ARCHITECTURE
+    $architecture = switch ($nativeArch) {
+        "AMD64" { "x64" }
+        "ARM64" { "arm64" }
+        default { throw "Node.js LTS is not available for this architecture ($nativeArch)." }
     }
 
     try {
