@@ -35,11 +35,12 @@ command is missing.
 #>
 [CmdletBinding()]
 param(
-    [ValidateScript({ Test-Path $_ -PathType Container })]
-    [string]$SharedSource = (Join-Path $PSScriptRoot "..\shared"),
+    # Empty means the bundled default, filled in below. Windows PowerShell 5.1
+    # run with -File leaves $PSScriptRoot empty inside param() defaults (it is
+    # only set in the body), so a default here would resolve against the cwd.
+    [string]$SharedSource = "",
 
-    [ValidateScript({ Test-Path $_ -PathType Container })]
-    [string]$ConfigSource = (Join-Path $PSScriptRoot "config"),
+    [string]$ConfigSource = "",
 
     [string]$CopilotDirectory = (Join-Path $HOME ".copilot"),
 
@@ -63,12 +64,35 @@ param(
 $ErrorActionPreference = "Stop"
 $script:RestartRequired = $false
 
-$sharedPath = (Resolve-Path $SharedSource).Path
-$sourcePath = (Resolve-Path $ConfigSource).Path
+# The source defaults, set here rather than in param() - see the note there.
+# No ValidateScript on them: it would re-validate these assignments too, and
+# Resolve-Path below already fails with "Cannot find path" for a missing one.
+if (-not $SharedSource) { $SharedSource = Join-Path $PSScriptRoot "..\shared" }
+if (-not $ConfigSource) { $ConfigSource = Join-Path $PSScriptRoot "config" }
+
+# A relative -CopilotDirectory would otherwise mean two different places:
+# PowerShell cmdlets resolve it against the current location, while .NET calls
+# and `git -C` resolve it against the process working directory, which
+# Set-Location does not move. Make it absolute once, here, against the former.
+$CopilotDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($CopilotDirectory)
+
+# .ProviderPath, not .Path: .Path keeps a PSDrive prefix for a location such as
+# a New-PSDrive drive, which .NET and git cannot read.
+#
+# -LiteralPath throughout: a plain -Path treats [ and ] as wildcards, so a
+# checkout under a folder such as "[work]" would not be found.
+$sharedPath = (Resolve-Path -LiteralPath $SharedSource).ProviderPath
+$sourcePath = (Resolve-Path -LiteralPath $ConfigSource).ProviderPath
 $targetPath = [IO.Path]::GetFullPath($CopilotDirectory)
 foreach ($root in @($sharedPath, $sourcePath)) {
     if ($root.TrimEnd("\") -eq $targetPath.TrimEnd("\")) {
         throw "The config source must not be the destination .copilot directory."
+    }
+    if ($root.StartsWith($targetPath.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The config source must not live inside the destination ($targetPath)."
+    }
+    if ($targetPath.StartsWith($root.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The destination must not live inside a config source ($root)."
     }
 }
 

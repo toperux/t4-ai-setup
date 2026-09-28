@@ -41,11 +41,12 @@ command is missing.
 #>
 [CmdletBinding()]
 param(
-    [ValidateScript({ Test-Path $_ -PathType Container })]
-    [string]$SharedSource = (Join-Path $PSScriptRoot "..\shared"),
+    # Empty means the bundled default, filled in below. Windows PowerShell 5.1
+    # run with -File leaves $PSScriptRoot empty inside param() defaults (it is
+    # only set in the body), so a default here would resolve against the cwd.
+    [string]$SharedSource = "",
 
-    [ValidateScript({ Test-Path $_ -PathType Container })]
-    [string]$ConfigSource = (Join-Path $PSScriptRoot "config"),
+    [string]$ConfigSource = "",
 
     [string]$ClaudeDirectory = (Join-Path $HOME ".claude"),
 
@@ -69,25 +70,25 @@ param(
     # prices, which is a personal choice rather than a baseline. Passing this
     # appends the "# Model routing" section to CLAUDE.md and installs the
     # coder/finder/scribe/tester agents it routes to, from ..\optional\model-routing.
-    [switch]$WithModelRouting
+    # Re-running without it removes the section, and any of those agents still
+    # identical to the shipped copy.
+    [switch]$WithModelRouting,
+
+    # Where the model routing part and agents come from (default
+    # ..\optional\model-routing). Passing it implies -WithModelRouting.
+    [string]$ModelRoutingSource = ""
 )
 
 $ErrorActionPreference = "Stop"
 $script:RestartRequired = $false
 
-$sharedPath = (Resolve-Path $SharedSource).Path
-$sourcePath = (Resolve-Path $ConfigSource).Path
-$targetPath = [IO.Path]::GetFullPath($ClaudeDirectory)
-$sourceRoots = @($sharedPath, $sourcePath)
-if ($WithModelRouting) {
-    $routingPath = (Resolve-Path (Join-Path $PSScriptRoot "..\optional\model-routing")).Path
-    $sourceRoots += $routingPath
-}
-foreach ($root in $sourceRoots) {
-    if ($root.TrimEnd("\") -eq $targetPath.TrimEnd("\")) {
-        throw "The config source must not be the destination .claude directory."
-    }
-}
+# The source defaults, set here rather than in param() - see the note there.
+# No ValidateScript on them: it would re-validate these assignments too, and
+# Resolve-Path below already fails with "Cannot find path" for a missing one.
+if (-not $SharedSource) { $SharedSource = Join-Path $PSScriptRoot "..\shared" }
+if (-not $ConfigSource) { $ConfigSource = Join-Path $PSScriptRoot "config" }
+$routingEnabled = $WithModelRouting -or $PSBoundParameters.ContainsKey("ModelRoutingSource")
+if (-not $ModelRoutingSource) { $ModelRoutingSource = Join-Path $PSScriptRoot "..\optional\model-routing" }
 
 # CLAUDE.md is assembled at install time from a platform-neutral core plus a
 # per-platform appendix, so the ~70 shared lines are not duplicated across the
@@ -101,6 +102,57 @@ $ComposedFile = @{
     Core    = "CLAUDE.core.md"
     Append  = "CLAUDE.append.md"
     Routing = "CLAUDE.model-routing.md"
+}
+
+# A relative -ClaudeDirectory would otherwise mean two different places:
+# PowerShell cmdlets resolve it against the current location, while .NET calls
+# and `git -C` resolve it against the process working directory, which
+# Set-Location does not move. Make it absolute once, here, against the former.
+$ClaudeDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ClaudeDirectory)
+
+# .ProviderPath, not .Path: .Path keeps a PSDrive prefix for a location such as
+# a New-PSDrive drive, which .NET and git cannot read.
+#
+# -LiteralPath throughout: a plain -Path treats [ and ] as wildcards, so a
+# checkout under a folder such as "[work]" would not be found.
+$sharedPath = (Resolve-Path -LiteralPath $SharedSource).ProviderPath
+$sourcePath = (Resolve-Path -LiteralPath $ConfigSource).ProviderPath
+$targetPath = [IO.Path]::GetFullPath($ClaudeDirectory)
+$sourceRoots = @($sharedPath, $sourcePath)
+$guardRoots = @($sharedPath, $sourcePath)
+
+# The routing directory is resolved whenever it exists, flag or not: a run
+# without the flag still reads it, to remove files an earlier opted-in run
+# installed (Remove-UnrequestedRoutingFiles), so it must be guarded like the
+# other sources. Only an opted-in run ships from it.
+$routingPath = $null
+if (Test-Path -LiteralPath $ModelRoutingSource -PathType Container) {
+    $routingPath = (Resolve-Path -LiteralPath $ModelRoutingSource).ProviderPath
+    $guardRoots += $routingPath
+}
+if ($routingEnabled) {
+    if (-not $routingPath) {
+        throw ("Model routing was requested (-WithModelRouting / -ModelRoutingSource), but its " +
+               "source directory was not found: $ModelRoutingSource")
+    }
+    # Checked here rather than at the copy, so a bad source fails before the
+    # toolchain step and the backup commit.
+    if (-not (Test-Path -LiteralPath (Join-Path $routingPath $ComposedFile.Routing) -PathType Leaf)) {
+        throw ("Model routing was requested, but $($ComposedFile.Routing) was not found " +
+               "in its source directory: $routingPath")
+    }
+    $sourceRoots += $routingPath
+}
+foreach ($root in $guardRoots) {
+    if ($root.TrimEnd("\") -eq $targetPath.TrimEnd("\")) {
+        throw "The config source must not be the destination .claude directory."
+    }
+    if ($root.StartsWith($targetPath.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The config source must not live inside the destination ($targetPath)."
+    }
+    if ($targetPath.StartsWith($root.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The destination must not live inside a config source ($root)."
+    }
 }
 
 # $ErrorActionPreference = "Stop" makes PowerShell treat ANY native-command
@@ -685,8 +737,9 @@ function Backup-ClaudeDirectory {
 
 # Every file the package ships, as a map of relative path -> absolute source.
 # Two roots are merged - the platform-neutral `shared` tree and the per-platform
-# overlay - with the overlay winning on a collision. -WithModelRouting adds
-# optional\model-routing as a third root. Enumerating rather than
+# overlay - with the overlay winning on a collision. Model routing adds
+# optional\model-routing as a third root, which wins over both: routing >
+# overlay > shared. Enumerating rather than
 # hardcoding means a file added to either tree is picked up automatically, and
 # anything NOT shipped - your own hooks, your own skills - is simply left alone.
 function Get-ShippedFileMap {
@@ -757,16 +810,12 @@ function Copy-ClaudeConfiguration {
             throw "The platform overlay is incomplete: $required was not found under $SharedSource or $ConfigSource."
         }
     }
-    if ($WithModelRouting -and -not $map.Contains($ComposedFile.Routing)) {
-        throw "-WithModelRouting was passed but $($ComposedFile.Routing) was not found under $routingPath."
-    }
 
     # settings.json is rendered from a template and CLAUDE.md is composed from
     # its parts; both are written straight into staging, so neither takes
     # part in the plain copy below.
-    $shipped = @($map.Keys | Where-Object {
-        $_ -ne "settings.json" -and $_ -ne $ComposedFile.Core -and $_ -ne $ComposedFile.Append -and
-        $_ -ne $ComposedFile.Routing
+    $shipped = @(Get-InstalledFiles $map | Where-Object {
+        $_ -ne "settings.json" -and $_ -ne $ComposedFile.Output
     })
     if (-not $shipped) {
         throw "No files found under $SharedSource or $ConfigSource - nothing to install."
@@ -864,6 +913,72 @@ function Copy-ClaudeConfiguration {
         }
     }
 
+}
+
+# Every file the routing root installs as-is - the agents and anything else in
+# it, minus the composed CLAUDE.md part - as paths relative to that root.
+function Get-RoutingFiles {
+    foreach ($file in (Get-ChildItem -LiteralPath $routingPath -Recurse -File)) {
+        $relativePath = $file.FullName.Substring($routingPath.Length).TrimStart("\")
+        if ($relativePath -ne $ComposedFile.Routing) {
+            $relativePath
+        }
+    }
+}
+
+# Model routing overwrites each file it ships. A copy that differs from the
+# shipped one is presumably your edit: normally the backup snapshot keeps it, so
+# warn; with -SkipBackup nothing would, so refuse. Read-only, and run before the
+# toolchain step, so a refusal comes before anything changes.
+function Assert-RoutingOverwrite {
+    $modified = @()
+    foreach ($relativePath in (Get-RoutingFiles)) {
+        $installed = Join-Path $ClaudeDirectory $relativePath
+        if ((Test-Path -LiteralPath $installed -PathType Leaf) -and
+            (Get-FileHash -LiteralPath (Join-Path $routingPath $relativePath)).Hash -ne
+            (Get-FileHash -LiteralPath $installed).Hash) {
+            $modified += $relativePath
+        }
+    }
+    if (-not $modified) {
+        return
+    }
+
+    if ($SkipBackup) {
+        throw ("-SkipBackup: model routing would replace modified $($modified -join ', ') in " +
+               "$ClaudeDirectory with no undo path. Move them aside, or re-run without -SkipBackup.")
+    }
+    foreach ($relativePath in $modified) {
+        Write-Warning "Model routing will replace modified $relativePath; the backup snapshot keeps the old copy."
+    }
+}
+
+# The opt-out half of model routing. CLAUDE.md is recomposed on every run, so
+# its section goes away by itself, but files an earlier opted-in run installed
+# would stay. Remove each one still identical to the shipped copy; one that
+# differs was edited, so it is kept. Files the shared tree or the overlay ship
+# are never touched, and neither is a file of your own.
+#
+# Known limit: after a repo edit to a routing file, older installed copies no
+# longer match and are kept.
+function Remove-UnrequestedRoutingFiles {
+    foreach ($relativePath in (Get-RoutingFiles)) {
+        if ((Test-Path -LiteralPath (Join-Path $sharedPath $relativePath)) -or
+            (Test-Path -LiteralPath (Join-Path $sourcePath $relativePath))) {
+            continue
+        }
+        $installed = Join-Path $ClaudeDirectory $relativePath
+        if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {
+            continue
+        }
+        if ((Get-FileHash -LiteralPath (Join-Path $routingPath $relativePath)).Hash -eq
+            (Get-FileHash -LiteralPath $installed).Hash) {
+            Remove-Item -LiteralPath $installed -Force
+            Write-Host "Removed $relativePath - model routing is off and it matched the shipped copy."
+        } else {
+            Write-Host "Kept $relativePath - it differs from the shipped model routing copy, so it is treated as yours."
+        }
+    }
 }
 
 # `graphify install` appends a skill-registration block to CLAUDE.md:
@@ -1029,6 +1144,10 @@ function Install-Plugins {
     }
 }
 
+if ($routingEnabled) {
+    Assert-RoutingOverwrite
+}
+
 if (-not $SkipToolchain) {
     Install-Toolchain
     Confirm-PythonShim
@@ -1044,6 +1163,9 @@ if ($SkipBackup) {
     Backup-ClaudeDirectory
 }
 Copy-ClaudeConfiguration
+if (-not $routingEnabled -and $routingPath) {
+    Remove-UnrequestedRoutingFiles
+}
 Install-GraphifySkill
 
 if (-not $SkipPlugins) {

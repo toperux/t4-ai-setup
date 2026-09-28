@@ -115,8 +115,10 @@ are joined is in
 Model routing is opt-in on Claude: `-WithModelRouting` (Windows) or
 `--with-model-routing` (WSL, macOS) appends a `# Model routing` section to
 `CLAUDE.md` and installs the `coder`, `finder`, `scribe` and `tester` agents it
-routes to. Re-running without the flag drops the section from `CLAUDE.md`; the
-agents stay.
+routes to. Re-running without the flag removes the section and any agent still
+identical to the shipped copy; edited agents are kept. That cleanup compares
+against the bundled copy only, so files installed from a custom source
+(`-ModelRoutingSource` / `--model-routing-source`) must be removed by hand.
 
 ## Skills
 

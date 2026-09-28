@@ -16,6 +16,7 @@ install-copilot-wsl.sh
 install-copilot-macos.sh
 claude/
   shared/                      config that is the same on every platform
+  optional/model-routing/      opt-in CLAUDE.md section + agents
   windows/
     setup-claude-windows.ps1   the installer
     config/                    the Windows-only config

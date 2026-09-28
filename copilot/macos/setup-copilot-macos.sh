@@ -68,6 +68,9 @@ for root in "$SHARED_SOURCE" "$CONFIG_SOURCE"; do
   case "$root" in "$COPILOT_DIR"/*)
     die "The config source must not live inside the destination ($COPILOT_DIR)." ;;
   esac
+  case "$COPILOT_DIR" in "$root"/*)
+    die "The destination must not live inside a config source ($root)." ;;
+  esac
 done
 
 # python3 strips the graphify block and validates JSON, and all five hooks are

@@ -35,7 +35,7 @@ Flags (to pass these through the one-liner, see the
 | Flag | Effect |
 | --- | --- |
 | `-WithRust` | Install Rust: rustup + the stable toolchain, `rust-analyzer`, and the `rust-analyzer-lsp` plugin. Off by default — see [Rust is opt-in](#rust-is-opt-in). |
-| `-WithModelRouting` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it drops the section from `CLAUDE.md`; the agents stay. |
+| `-WithModelRouting` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it removes the section and any agent still identical to the shipped copy; edited agents are kept. |
 | `-SkipToolchain` | Only copy the config; install no tools. |
 | `-SkipPlugins` | Skip the `claude plugin` installs. |
 | `-SkipBackup` | Don't git-commit `~/.claude` first. Overwrites with no undo path. Only needed if you're running `-SkipToolchain` on a machine without git. |
@@ -43,6 +43,7 @@ Flags (to pass these through the one-liner, see the
 | `-PythonVersion <x.y>` | Python version to install (default `3.14`). |
 | `-SharedSource <path>` | The platform-neutral config tree (default `..\shared`). |
 | `-ConfigSource <path>` | The platform overlay (default `.\config`). |
+| `-ModelRoutingSource <path>` | The model routing part and agents (default `..\optional\model-routing`). Implies `-WithModelRouting`. Opt-out cleanup compares against the bundled copy only, so files installed from a custom source must be removed by hand. |
 
 ## What's in the package
 
@@ -53,7 +54,7 @@ merges them, with the overlay winning on a collision.
 | File | What it does |
 | --- | --- |
 | `shared/CLAUDE.core.md` + `windows/config/CLAUDE.append.md` | Global instructions loaded into every session: think before coding, simplicity first, surgical changes, goal-driven execution. Plus a terse-reporting preference and a Windows/Git-Bash rule about never putting `cd` in a compound command that also writes. **Composed into `~/.claude/CLAUDE.md` at install time** — see below. |
-| `windows/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, telemetry off, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`, `cd` and `pushd`. Wires up the hooks and statusline below, and enables the plugins — four with `-WithRust`, otherwise three, since `rust-analyzer-lsp` is removed for a no-Rust install. |
+| `windows/config/settings.json` | Model `opus`, `effortLevel: high` (`medium` for `claude-opus-5-5` and `low` for `claude-sonnet-5` via `modelSettings`), dark fullscreen TUI, telemetry off, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`, `cd` and `pushd`. Wires up the hooks and statusline below, and enables the plugins — four with `-WithRust`, otherwise three, since `rust-analyzer-lsp` is removed for a no-Rust install. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse hook. Hard-blocks Read/Edit/Write on secret-ish files (exits 2), independent of the deny-rules — belt and braces. |
 | `shared/hooks/worktree_guard.py` | PreToolUse hook on Bash. Denies `git worktree add` anywhere outside `<cwd>/.claude/worktrees/` or `%TEMP%/claude/`, so worktrees stop landing in the workspace root or `C:\`. |
 | `windows/config/statusline-command.ps1` | Statusline: ponytail marker, reasoning effort, then capsule pills for model/context, 5-hour and 7-day rate limits, followed by the logged-in account email and current git branch. |
@@ -196,7 +197,11 @@ adjust before running if any of that doesn't suit you.
 
 - **Transactional copy.** Everything is staged first and swapped in at the end.
   If any step fails midway, your previous config is restored rather than left
-  half-replaced.
+  half-replaced. The one exception: a run without `-WithModelRouting` deletes
+  model routing files an earlier run installed, if they still match the bundled
+  copy. That happens after the swap, so a run that then fails does not roll it
+  back; the backup snapshot keeps them (with `-SkipBackup`, only unmodified
+  bundled copies are deleted).
 - **Node.js is checksum-verified.** The MSI is matched against the SHA256 that
   nodejs.org publishes before it is executed.
 - **The backup repo is created in `~/.claude` itself**, never a parent. If your

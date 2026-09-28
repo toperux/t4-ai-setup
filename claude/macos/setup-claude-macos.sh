@@ -6,6 +6,7 @@
 #   bash setup-claude-macos.sh
 #   bash setup-claude-macos.sh --skip-toolchain --skip-plugins
 #   bash setup-claude-macos.sh --with-model-routing
+#   bash setup-claude-macos.sh --model-routing-source <dir>
 #
 # Version policy - nothing already installed is upgraded; these apply only when
 # a command is missing. git, jq, python3, uv and Node come from Homebrew; rustup,
@@ -20,11 +21,15 @@ CLAUDE_DIR="$HOME/.claude"
 SKIP_TOOLCHAIN=0
 SKIP_PLUGINS=0
 SKIP_BACKUP=0
-# Model routing is opt-in (--with-model-routing): it names specific models and
-# prices, which is a personal choice rather than a baseline. When set, this root
-# appends the "# Model routing" section to CLAUDE.md and installs the
-# coder/finder/scribe/tester agents it routes to. Empty means off.
-ROUTING_SOURCE=""
+# Model routing is opt-in (--with-model-routing, or --model-routing-source,
+# which implies it): it names specific models and prices, which is a personal
+# choice rather than a baseline. When on, this root appends the "# Model routing"
+# section to CLAUDE.md and installs the coder/finder/scribe/tester agents it
+# routes to. When off, the root is still read if it exists (ROUTING_RESOLVED=1),
+# to remove files an earlier opted-in run installed.
+WITH_MODEL_ROUTING=0
+ROUTING_RESOLVED=0
+ROUTING_SOURCE="$SCRIPT_DIR/../optional/model-routing"
 
 # CLAUDE.md is assembled at install time from a platform-neutral core plus a
 # per-platform appendix, so the ~70 shared lines are not duplicated across the
@@ -42,11 +47,12 @@ while [ $# -gt 0 ]; do
     --skip-toolchain) SKIP_TOOLCHAIN=1 ;;
     --skip-plugins)   SKIP_PLUGINS=1 ;;
     --skip-backup)    SKIP_BACKUP=1 ;;
-    --with-model-routing) ROUTING_SOURCE="$SCRIPT_DIR/../optional/model-routing" ;;
+    --with-model-routing) WITH_MODEL_ROUTING=1 ;;
+    --model-routing-source) ROUTING_SOURCE="${2:?--model-routing-source requires a path}"; WITH_MODEL_ROUTING=1; shift ;;
     --shared-source)  SHARED_SOURCE="${2:?--shared-source requires a path}"; shift ;;
     --config-source)  CONFIG_SOURCE="${2:?--config-source requires a path}"; shift ;;
     --claude-dir)     CLAUDE_DIR="${2:?--claude-dir requires a path}"; shift ;;
-    -h|--help)        sed -n '3,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)        sed -n '3,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -68,16 +74,31 @@ have() { command -v "$1" >/dev/null 2>&1; }
 [ -d "$CONFIG_SOURCE" ] || die "Platform config source not found: $CONFIG_SOURCE"
 SHARED_SOURCE="$(cd "$SHARED_SOURCE" && pwd)"
 CONFIG_SOURCE="$(cd "$CONFIG_SOURCE" && pwd)"
-if [ -n "$ROUTING_SOURCE" ]; then
-  [ -d "$ROUTING_SOURCE" ] || die "Model routing source not found: $ROUTING_SOURCE"
+# The routing root is resolved whenever it exists, flag or not, so it is guarded
+# like the others below. Only an existing directory is cd'd into: a failing `cd`
+# would abort a flag-off run under `set -e`.
+if [ -d "$ROUTING_SOURCE" ]; then
   ROUTING_SOURCE="$(cd "$ROUTING_SOURCE" && pwd)"
+  ROUTING_RESOLVED=1
+elif [ "$WITH_MODEL_ROUTING" -eq 1 ]; then
+  die "Model routing was requested (--with-model-routing / --model-routing-source), but its source was not found: $ROUTING_SOURCE"
+fi
+# Checked here rather than at the copy, so a bad source fails before the
+# toolchain step and the backup commit.
+if [ "$WITH_MODEL_ROUTING" -eq 1 ] && [ ! -f "$ROUTING_SOURCE/$COMPOSED_ROUTING" ]; then
+  die "Model routing was requested, but $COMPOSED_ROUTING was not found in its source directory: $ROUTING_SOURCE"
 fi
 mkdir -p "$CLAUDE_DIR"
 CLAUDE_DIR="$(cd "$CLAUDE_DIR" && pwd)"
-for root in "$SHARED_SOURCE" "$CONFIG_SOURCE" ${ROUTING_SOURCE:+"$ROUTING_SOURCE"}; do
+guard_roots=("$SHARED_SOURCE" "$CONFIG_SOURCE")
+[ "$ROUTING_RESOLVED" -eq 0 ] || guard_roots+=("$ROUTING_SOURCE")
+for root in "${guard_roots[@]}"; do
   [ "$root" != "$CLAUDE_DIR" ] || die "The config source must not be the destination directory."
   case "$root" in "$CLAUDE_DIR"/*)
     die "The config source must not live inside the destination ($CLAUDE_DIR)." ;;
+  esac
+  case "$CLAUDE_DIR" in "$root"/*)
+    die "The destination must not live inside a config source ($root)." ;;
   esac
 done
 
@@ -413,23 +434,29 @@ shipped_files() {
   {
     (cd "$SHARED_SOURCE" && find . -type f | sed 's|^\./||')
     (cd "$CONFIG_SOURCE" && find . -type f | sed 's|^\./||')
-    if [ -n "$ROUTING_SOURCE" ]; then
+    if [ "$WITH_MODEL_ROUTING" -eq 1 ]; then
       (cd "$ROUTING_SOURCE" && find . -type f | sed 's|^\./||')
     fi
   } | sort -u
 }
 
-# Resolve a relative path to its absolute source, overlay winning.
+# Resolve a relative path to its absolute source: routing (when on) > overlay >
+# shared.
 resolve_source() {
-  if [ -n "$ROUTING_SOURCE" ] && [ -f "$ROUTING_SOURCE/$1" ]; then printf '%s' "$ROUTING_SOURCE/$1"
+  if [ "$WITH_MODEL_ROUTING" -eq 1 ] && [ -f "$ROUTING_SOURCE/$1" ]; then printf '%s' "$ROUTING_SOURCE/$1"
   elif [ -f "$CONFIG_SOURCE/$1" ]; then printf '%s' "$CONFIG_SOURCE/$1"
   else printf '%s' "$SHARED_SOURCE/$1"; fi
+}
+
+# Filters the parts of the composed file out of a list of relative paths.
+without_composed_parts() {
+  grep -vxF -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND" -e "$COMPOSED_ROUTING"
 }
 
 # What actually lands in ~/.claude: everything shipped, minus the parts of the
 # composed file, plus the composed file itself.
 installed_files() {
-  shipped_files | grep -vxF -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND" -e "$COMPOSED_ROUTING"
+  shipped_files | without_composed_parts
   printf '%s\n' "$COMPOSED_OUTPUT"
 }
 
@@ -439,9 +466,8 @@ copy_configuration() {
     [ -f "$(resolve_source "$rel")" ] \
       || die "The platform overlay is incomplete: $rel was not found under $SHARED_SOURCE or $CONFIG_SOURCE."
   done
-  if [ -n "$ROUTING_SOURCE" ]; then
+  if [ "$WITH_MODEL_ROUTING" -eq 1 ]; then
     routing="$ROUTING_SOURCE/$COMPOSED_ROUTING"
-    [ -f "$routing" ] || die "--with-model-routing was passed but $COMPOSED_ROUTING was not found under $ROUTING_SOURCE."
   fi
   [ -f "$(resolve_source settings.json)" ] || die "settings.json was not found in either config source."
 
@@ -480,7 +506,7 @@ copy_configuration() {
     [ -n "$rel" ] || continue
     mkdir -p "$staging/$(dirname "$rel")"
     cp "$(resolve_source "$rel")" "$staging/$rel"
-  done < <(shipped_files | grep -vxF -e settings.json -e "$COMPOSED_CORE" -e "$COMPOSED_APPEND" -e "$COMPOSED_ROUTING")
+  done < <(shipped_files | without_composed_parts | grep -vxF settings.json)
 
   # CLAUDE.md is the two halves joined byte for byte, plus the model routing
   # part when --with-model-routing is set.
@@ -518,6 +544,56 @@ PY
   trap - ERR
   rm -rf "$staging" "$backup"
   say "Configuration written to $CLAUDE_DIR"
+}
+
+# Every file the routing root installs as-is - the agents and anything else in
+# it, minus the composed CLAUDE.md part - as paths relative to that root.
+routing_files() {
+  (cd "$ROUTING_SOURCE" && find . -type f | sed 's|^\./||') | grep -vxF "$COMPOSED_ROUTING"
+}
+
+# Model routing overwrites each file it ships. A copy that differs from the
+# shipped one is presumably your edit: normally the backup snapshot keeps it, so
+# warn; with --skip-backup nothing would, so refuse. Read-only, and run before
+# the toolchain step, so a refusal comes before anything changes. `if cmp -s`,
+# never a bare `cmp`: its exit 1 for "differs" would end the run under `set -e`.
+check_routing_overwrite() {
+  local rel modified=""
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    [ -f "$CLAUDE_DIR/$rel" ] || continue
+    if cmp -s "$ROUTING_SOURCE/$rel" "$CLAUDE_DIR/$rel"; then continue; fi
+    if [ "$SKIP_BACKUP" -eq 1 ]; then
+      modified="$modified $rel"
+    else
+      warn "Model routing will replace modified $rel; the backup snapshot keeps the old copy."
+    fi
+  done < <(routing_files)
+  [ -z "$modified" ] || die "--skip-backup: model routing would replace modified$modified in $CLAUDE_DIR
+with no undo path. Move them aside, or re-run without --skip-backup."
+}
+
+# The opt-out half of model routing. CLAUDE.md is recomposed on every run, so
+# its section goes away by itself, but files an earlier opted-in run installed
+# would stay. Remove each one still identical to the shipped copy; one that
+# differs was edited, so it is kept. Files the shared tree or the overlay ship
+# are never touched, and neither is a file of your own.
+#
+# Known limit: after a repo edit to a routing file, older installed copies no
+# longer match and are kept.
+remove_unrequested_routing_files() {
+  local rel
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -f "$SHARED_SOURCE/$rel" ] || [ -f "$CONFIG_SOURCE/$rel" ]; then continue; fi
+    [ -f "$CLAUDE_DIR/$rel" ] || continue
+    if cmp -s "$ROUTING_SOURCE/$rel" "$CLAUDE_DIR/$rel"; then
+      rm -f "$CLAUDE_DIR/$rel"
+      say "Removed $rel - model routing is off and it matched the shipped copy."
+    else
+      say "Kept $rel - it differs from the shipped model routing copy, so it is treated as yours."
+    fi
+  done < <(routing_files)
 }
 
 # ---------------------------------------------------------------------------
@@ -643,6 +719,10 @@ install_plugins() {
 # Run
 # ---------------------------------------------------------------------------
 
+if [ "$WITH_MODEL_ROUTING" -eq 1 ]; then
+  check_routing_overwrite
+fi
+
 if [ "$SKIP_TOOLCHAIN" -eq 0 ]; then
   install_toolchain
 fi
@@ -658,6 +738,9 @@ else
 fi
 
 copy_configuration
+if [ "$WITH_MODEL_ROUTING" -eq 0 ] && [ "$ROUTING_RESOLVED" -eq 1 ]; then
+  remove_unrequested_routing_files
+fi
 install_graphify_skill
 
 [ "$SKIP_PLUGINS" -eq 0 ] && install_plugins

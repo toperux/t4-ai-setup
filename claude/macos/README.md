@@ -42,10 +42,11 @@ Idempotent — safe to re-run. Anything already installed is skipped.
 | `--skip-toolchain` | Only copy the config; install no tools. |
 | `--skip-plugins` | Skip the `claude plugin` installs. |
 | `--skip-backup` | Don't git-commit `~/.claude` first. Overwrites with no undo path. Only needed if you're running `--skip-toolchain` on a machine without git. |
-| `--with-model-routing` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it drops the section from `CLAUDE.md`; the agents stay. |
+| `--with-model-routing` | Append the `# Model routing` section to `CLAUDE.md` and install the `coder`, `finder`, `scribe` and `tester` agents it routes to, from `optional/model-routing/`. Off by default. Re-running without it removes the section and any agent still identical to the shipped copy; edited agents are kept. |
 | `--claude-dir <path>` | Write the config somewhere other than `~/.claude`. |
 | `--shared-source <path>` | The platform-neutral config tree (default `../shared`). |
 | `--config-source <path>` | The platform overlay (default `./config`). |
+| `--model-routing-source <path>` | The model routing part and agents (default `../optional/model-routing`). Implies `--with-model-routing`. Opt-out cleanup compares against the bundled copy only, so files installed from a custom source must be removed by hand. |
 | `--ref <ref>` | *(bootstrap only)* Branch, tag or SHA to install from. |
 
 ## What's in the package
@@ -57,7 +58,7 @@ with the overlay winning on a collision.
 | File | What it does |
 | --- | --- |
 | `shared/CLAUDE.core.md` + `macos/config/CLAUDE.append.md` | Global instructions loaded into every session: think before coding, simplicity first, surgical changes, goal-driven execution. Plus a terse-reporting preference and a macOS note about the BSD userland, bash 3.2, the case-insensitive filesystem and `brew --prefix`. **Composed into `~/.claude/CLAUDE.md` at install time** — see below. |
-| `macos/config/settings.json` | Model `opus`, `effortLevel: high`, dark fullscreen TUI, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`. Wires up the hooks and statusline below, and enables the four plugins. |
+| `macos/config/settings.json` | Model `opus`, `effortLevel: high` (`medium` for `claude-opus-5-5` and `low` for `claude-sonnet-5` via `modelSettings`), dark fullscreen TUI, autocompact at 60% of the context window. Deny-rules covering `.env`, `*.pem`, `*.key`, `secrets/`, `appsettings*.json`, `web.config`, `local.settings.json`, plus `git push`. Wires up the hooks and statusline below, and enables the four plugins. |
 | `shared/hooks/check_sensitive_files.py` | PreToolUse hook. Hard-blocks Read/Edit/Write on secret-ish files (exits 2), independent of the deny-rules — belt and braces. |
 | `shared/hooks/worktree_guard.py` | PreToolUse hook on Bash. Denies `git worktree add` outside the allowed roots, so worktrees stop landing in the workspace root. |
 | `macos/config/statusline-command.sh` | Statusline: ponytail marker, reasoning effort, then capsule pills for model/context, 5-hour and 7-day rate limits, followed by account email and current git branch. Needs `python3`. |
@@ -149,7 +150,11 @@ probe fails.
   was replaced. If any step fails midway the previous config is restored and the
   script exits non-zero, rather than leaving `~/.claude` half-replaced.
 - **Only shipped files are touched.** The installer enumerates *files*, never
-  directories, so your own hooks and skills are left alone.
+  directories, so your own hooks and skills are left alone. The one exception: a
+  run without `--with-model-routing` deletes model routing files an earlier run
+  installed, if they still match the bundled copy. That happens after the swap,
+  so a run that then fails does not roll it back; the backup snapshot keeps them
+  (with `--skip-backup`, only unmodified bundled copies are deleted).
 - **The backup repo is created in `~/.claude` itself**, never a parent — a
   dotfiles setup where `$HOME` is already a git repo won't get an unrelated
   commit.
