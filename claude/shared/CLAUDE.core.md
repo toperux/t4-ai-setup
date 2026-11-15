@@ -79,8 +79,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Plugin conflicts
 
-- **ponytail** → where it conflicts with this file, this file wins. It still wins over superpowers.
-- **superpowers** → on trial. Where one of its skills conflicts with this file, another plugin, or another skill, superpowers loses.
+- **ponytail** → where it conflicts with this file, this file wins.
 
 # rtk
 A hook transparently rewrites shell commands through `rtk` (token-optimized proxy) — no action needed. Meta commands: `rtk gain` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (raw passthrough for debugging).

@@ -91,7 +91,7 @@ WSL and macOS still install Rust, because `cargo` is how `rtk` is built there.
 ## What's in the global instructions
 
 `CLAUDE.md` / `copilot-instructions.md` are the same document, and it is short —
-four behavioural rules plus two notes:
+four behavioural rules plus three notes:
 
 - **Think before coding** — state assumptions, surface multiple readings rather
   than silently picking one, say so when a simpler approach exists.
@@ -103,6 +103,8 @@ four behavioural rules plus two notes:
 - **Goal-driven execution** — turn the task into a verifiable goal and state a
   short plan with a check per step.
 - **A reporting preference** — terse, outlined, no sycophancy.
+- **A plugin precedence rule** (Claude only) — where the ponytail plugin
+  conflicts with these instructions, the instructions win.
 - **A pointer to `RTK.md`**, so the model knows its shell commands are being
   rewritten and what the `rtk` meta commands are.
 
