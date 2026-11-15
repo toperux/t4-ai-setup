@@ -6,6 +6,7 @@ description: Use when asked to sync, back-port, pull or bring changes made in th
 # sync-claude-config
 
 Back-port edits made in `~/.claude` into `claude/`. Detect, classify, menu, apply, verify.
+Repo-ahead items go the other way: take them with `update-claude-config`.
 
 Hard rules:
 
@@ -67,6 +68,7 @@ One menu item = one logical change. It may span hunks or files. `skills/graphify
 - *removal* — live lacks something the repo has. Never recommend "take":
   - `~/.claude` history shows it present, then removed → your call, with the date
   - otherwise → *unknown*, most likely an install older than that repo addition
+- *move* — a line present on both sides in different places. One item, not a removal. Classify it by the side that added the new structure. `git log -S` cannot see a move: the line count does not change.
 - Secondary, only when `~/.claude` is a git repo:
   - Add the date of the live change ("live since MM-DD").
   - If it predates the repo file's last commit, add "passed over by `<commit>`". A hint, not a verdict.
@@ -85,7 +87,7 @@ One menu item = one logical change. It may span hunks or files. `skills/graphify
 
 | Case | Rec |
 |---|---|
-| personal / machine | skip |
+| personal / machine | not offered — no number |
 | repo ahead | skip — live copy stale |
 | live ahead, no flag | take |
 | live ahead with any other flag, or direction unknown | your call |
@@ -93,7 +95,7 @@ One menu item = one logical change. It may span hunks or files. `skills/graphify
 | shipped file deleted from `~/.claude` (`MISSING`) | your call |
 | file not shipped today (candidate addition) | footer only, default skip |
 
-Only *repo ahead* and *personal / machine* force a skip. A "passed over" note informs, it does not decide.
+Only *repo ahead* forces a skip; *personal / machine* is never offered. A "passed over" note informs, it does not decide.
 
 Before building the menu, read `skipped.local.md` (next to this file) if it exists. Items matching an entry go to the "previously skipped" count, not the menu.
 
@@ -101,13 +103,14 @@ Before building the menu, read `skipped.local.md` (next to this file) if it exis
 
 Post in chat:
 
-1. Summary table `# · file · change · direction · flag · rec`, grouped **Take → Your call → Skip**.
+1. Summary table `# · file · change · direction · flag · rec`, grouped **Take → Your call → Skip**, then **Personal — not offered** as one compact unnumbered line.
+   - Personal / machine items get no number and cannot be picked. They are worked out again on every run.
 2. Detail bullets for each Take and Your call item: change (before → after, one or two lines), lands in, also touches. Skip items stay one line each, with the reason. Repo-ahead items show the repo's value.
 3. Footer:
    - noise ignored: CRLF, `*.bak`, a `# graphify` block in live `CLAUDE.md` (the installers strip it on purpose)
    - not shipped today: one line per candidate addition
    - `previously skipped (n)`
-4. Reply syntax: `1 3 5` · `recommended` · `all` · `none` · `7?` (full diff of item 7) · `skipped?` (expand the skip list).
+4. Reply syntax: `1 3 5` · `recommended` · `all` (Take + Your call) · `none` · `7?` (full diff of item 7) · `skipped?` (list skip-list entries, unnumbered; naming an entry brings it back into the menu).
 
 Use a typed reply, not the ask UI: it caps at 4 options and a run has 10-20 items.
 
@@ -119,15 +122,15 @@ Use a typed reply, not the ask UI: it caps at 4 options and a run has 10-20 item
 - Update the "Also touches" docs in the same pass.
 - A picked new file goes under `shared/` (or the current overlay if platform-specific), plus its rows in `claude/README.md` and `docs/what-it-installs.md`.
 - Update `skipped.local.md` (gitignored, one per machine):
-  - Every item not taken gets one line: file, key or heading, short value summary, reason, date.
-  - Personal / machine items record the key only, never the value, and match on the key alone.
+  - Every numbered item not taken gets one line: file, key or heading, short value summary, reason, date.
+  - Personal / machine items are never written to it.
   - Drop an entry when its drift is gone, or when the live value no longer matches its summary, so a real update resurfaces.
-  - It is the only memory. On later runs anything not in it is a live change or repo-ahead.
+  - It is the only memory. On later runs anything not in it is a live change, repo-ahead or personal.
 
 ## Step 5 — verify
 
 - Re-run `drift.sh`: taken items are gone, skipped ones remain, nothing new appeared.
-- All three `settings.json` parse: `jq empty <file>`, or `python3 -m json.tool <file>` without `jq`.
+- All three `settings.json` parse: `jq empty <file>`; without `jq`, `python -m json.tool <file>` on Windows and `python3 -m json.tool <file>` elsewhere (on Windows only `python` is guaranteed; `python3` can be the Store stub).
 - `wsl` and `macos` `settings.json` are identical; windows vs wsl differs only on the known platform lines.
-- No `\r`, no home path, user name or email, and no value from a personal item. Check `git diff` and untracked files (`git ls-files --others --exclude-standard`); `git diff` alone misses new files.
+- No `\r` (count with `tr -cd '\r' < file | wc -c`, never `grep`: Git Bash's `grep` strips CR and reports 0 for a fully CRLF file), no home path, user name or email, and no value from a personal item. Check `git diff` and untracked files (`git ls-files --others --exclude-standard`); `git diff` alone misses new files.
 - Show `git diff --stat` and a proposed commit message in the repo's style (imperative, sentence case, no prefix). Stop.
