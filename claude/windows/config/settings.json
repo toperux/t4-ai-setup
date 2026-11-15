@@ -6,6 +6,11 @@
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
   "permissions": {
     "deny": [
       "Read(**/.env)",
@@ -117,11 +122,20 @@
     },
     "claude-opus-5-5": {
       "effortLevel": "medium"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "low"
+    },
+    "claude-fable-5-2": {
+      "effortLevel": "high"
     }
   },
   "autoCompactWindow": 600000,
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
   "theme": "dark",
-  "preferredNotifChannel": "terminal_bell"
+  "preferredNotifChannel": "terminal_bell",
+  "switchModelsOnFlag": false,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
