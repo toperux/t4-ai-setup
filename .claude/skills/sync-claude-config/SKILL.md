@@ -114,6 +114,8 @@ Post in chat:
 
 Use a typed reply, not the ask UI: it caps at 4 options and a run has 10-20 items.
 
+Then stop and wait for the reply. Nothing is applied without one, even when every item is Take: a standing "don't ask when the answer is clear" instruction does not cover this step.
+
 ## Step 4 — apply
 
 - Surgical `Edit`s on repo files. Never copy a live file over (CRLF, personal values).

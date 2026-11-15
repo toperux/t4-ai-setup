@@ -96,6 +96,8 @@ Post in chat:
 3. Footer: noise ignored (CRLF, `*.bak`), live-only files left alone (candidate additions from `drift.sh`), `previously skipped (n)`.
 4. Reply syntax: `1 3 5` · `recommended` · `all` · `none` · `7?` (full diff of item 7) · `skipped?` (list skip-list entries, unnumbered) · `yours?` (expand the Yours line).
 
+Then stop and wait for the reply. Nothing is applied without one, even when every item is Take: a standing "don't ask when the answer is clear" instruction does not cover this step.
+
 ## Step 4 — apply
 
 0. **Re-check.** Run `drift.sh` again right before applying. Stop if the patch or summary checksum differs from Step 1, or the repo's `HEAD` or `git status --porcelain` differs from Step 0. The render dir is shared and wiped on every run, so another session, or a live edit made while the menu sat, would otherwise change what gets copied.
