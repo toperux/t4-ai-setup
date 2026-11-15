@@ -2,7 +2,7 @@
 
 Behavioral guidelines for coding work.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+**Tradeoff:** These guidelines favor small, verified changes over speed. For trivial tasks, use judgment.
 
 ## 1. Think Before Coding
 
@@ -51,12 +51,7 @@ Transform tasks into verifiable goals:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
+For multi-step tasks, say up front in a line or two what you will do and how you will verify it.
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
@@ -65,7 +60,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Reporting to me in chat
 
 - **Concise** → lead with the answer or outcome. Cut filler and restated context.
-- **Outline form** → headings and bullets so I can scan. No paragraphs.
+- **Outline form** → headings and bullets so I can scan. No long paragraphs.
 - **Short lines** → one idea per bullet. Split long sentences.
 - **Candid** → judge my ideas on their merits. Disagree plainly when warranted.
 
@@ -81,6 +76,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Earlier fixes** → check the proposal against what earlier steps fixed and what I called good. If it trades one of those away, say so before proposing it, or drop it.
 - **Rare vs common** → say when a symptom is rare. Don't trade the common case for a rare one without asking me.
 - **No circling** → after two tries at the same symptom without a clear gain, stop and re-read the whole situation before a third.
+
+## Plugin conflicts
+
+- **ponytail** → where it conflicts with this file, this file wins. It still wins over superpowers.
+- **superpowers** → on trial. Where one of its skills conflicts with this file, another plugin, or another skill, superpowers loses.
 
 # rtk
 A hook transparently rewrites shell commands through `rtk` (token-optimized proxy) — no action needed. Meta commands: `rtk gain` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (raw passthrough for debugging).
