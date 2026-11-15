@@ -4,5 +4,6 @@
 # Generated knowledge graph: derived from the tree, stale after any commit.
 graphify-out/
 
-# Per-machine skip list of the sync-claude-config skill: may name personal settings.
+# Per-machine skip lists of the sync-claude-config and update-claude-config skills: may name personal settings.
 .claude/skills/sync-claude-config/skipped.local.md
+.claude/skills/update-claude-config/skipped.local.md
