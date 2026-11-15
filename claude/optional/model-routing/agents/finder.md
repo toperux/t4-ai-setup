@@ -2,6 +2,7 @@
 name: finder
 description: Read-only search and lookup across the codebase. Use for finding files, symbols, usages, or answering "where is X" questions.
 model: haiku
+effort: low
 tools: Read, Grep, Glob
 ---
 

@@ -1,14 +1,14 @@
 
 # Model routing
 
-Prices ($/M tokens, in/out): Fable 5.1 10/50 · Opus 5.5 4/20 · Sonnet 5 2/10 · Haiku 4.5 1/5 (200K ctx).
+Prices ($/M tokens, in/out, checked 2026-11-15): Fable 5.2 8/40 · Opus 5.5 4/20 · Sonnet 5.5 2/10 · Haiku 5.5 0.10/0.50 (0.50/2.50 past 100K-token prompts).
 
 | Work | Who | Model | Effort |
 |---|---|---|---|
 | Orchestration, plan mode, spec refinement, review of subagent diffs, smoke-test triage | main session | Fable | set via `/effort` |
 | Implementing a planned change, writing tests | `coder` agent | Opus | high |
 | Running gates / tests, reporting output | `tester` agent | Sonnet | low |
-| Searches, lookups, file inventories | `finder` agent | Haiku | n/a (Haiku 4.5 has no effort) |
+| Searches, lookups, file inventories | `finder` agent | Haiku | low |
 | Doc edits, writing one-off scripts, big-file reads | `scribe` agent | Sonnet | low |
 
 Rules:
