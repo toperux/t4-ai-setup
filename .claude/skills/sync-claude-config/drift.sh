@@ -10,7 +10,13 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 live="$HOME/.claude"
 [ -d "$live" ] || die "$live does not exist - nothing to compare against."
 work="${TMPDIR:-/tmp}/claude-config-drift"
-rm -rf "$work" && mkdir -p "$work/render"
+# Separate statements, so a failed rm stops the run instead of leaving stale
+# render files. No -p on the work dir: a dir someone else pre-created fails
+# here. Owner-only because drift.patch holds live settings; umask rather than
+# `mkdir -m`, which Git Bash cannot apply on NTFS.
+rm -rf "$work"
+(umask 077 && mkdir "$work")
+mkdir "$work/render"
 work="$(cd "$work" && pwd)"
 render="$work/render"
 log="$work/installer.log"

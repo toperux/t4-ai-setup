@@ -9,7 +9,7 @@ Take repo changes in `claude/` into `~/.claude`. The mirror of `sync-claude-conf
 
 Hard rules:
 
-- Write to `~/.claude` only. Never to the repo, apart from this skill's own `skipped.local.md`.
+- Write to `~/.claude` only. Never to the repo, apart from this skill's own `skipped.local.md` and Step 0's fast-forward (`git pull --ff-only`).
 - Never run the installer against `~/.claude`: it replaces `settings.json` and `CLAUDE.md` wholesale and drops personal values and live edits.
 - Install nothing: no tools, no plugins. Name the install command instead.
 - Never number, apply or overwrite a personal / machine value.
@@ -44,7 +44,8 @@ One menu item = one logical change. It may span hunks or files. `skills/graphify
 | Outcome | Meaning here | Rec |
 |---|---|---|
 | *repo ahead* | the repo changed this, live still has the old version | take |
-| `MISSING` file | the repo ships a file the live config lacks | take |
+| `MISSING` file, `~/.claude` history shows you deleted it | deliberate | yours |
+| `MISSING` file, anything else | a new repo file, or one you deleted; show the date the repo first added it | your call |
 | *removal*, live history shows you removed it | deliberate | yours |
 | *removal*, the live file was last modified **before** the repo commit that added the line | nobody removed it; the file predates the addition | take |
 | *removal*, anything else | cannot tell a stale install from a deliberate deletion | your call |
@@ -53,7 +54,7 @@ One menu item = one logical change. It may span hunks or files. `skills/graphify
 | live file the repo used to ship (Step 1's deletion list) | the repo dropped it | your call |
 | live-only file the repo never shipped | yours | footer only |
 
-- The removal rows are cautious on purpose: "take" for an unexplained removal would quietly undo a deletion on any machine without `~/.claude` history.
+- The removal and `MISSING` rows are cautious on purpose: "take" for an unexplained removal would quietly undo a deletion on any machine without `~/.claude` history. A missing file has no mtime to test, so it is never "take".
 - Removal comparison, exactly:
   - repo side: the **first** commit that added the line, by **author** date — `git log --reverse --format=%at -S'<line>' -- <repo file> | head -1`. Not the newest match (a line can be dropped and re-added), not the committer date (a rebase moves it).
   - Search the stable part of the line, so a later cosmetic change is not mistaken for the addition. In `settings.json`: the key alone (`"X":`), no value punctuation, no trailing comma.
@@ -84,7 +85,7 @@ Before building the menu, read `skipped.local.md` (next to this file) if it exis
 
 Same layout and reply syntax as `sync-claude-config`:
 
-- Only items safe to apply get a number. Unnumbered **Yours — not offered** = personal / machine, live ahead, deliberate removal, deliberate revert. No reply can pick them.
+- Only items safe to apply get a number. Unnumbered **Yours — not offered** = personal / machine, live ahead, deliberate removal, a shipped file you deleted, deliberate revert. No reply can pick them.
 - Numbered **Skip** = a repo-ahead item a flag turned into skip (state Claude Code writes itself, graphify version mismatch).
 - `all` = Take + Your call. A Skip item is applied only when its number is named.
 

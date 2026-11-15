@@ -108,7 +108,7 @@ Post in chat:
 2. Detail bullets for each Take and Your call item: change (before → after, one or two lines), lands in, also touches. Skip items stay one line each, with the reason. Repo-ahead items show the repo's value.
 3. Footer:
    - noise ignored: CRLF, `*.bak`, a `# graphify` block in live `CLAUDE.md` (the installers strip it on purpose)
-   - not shipped today: one line per candidate addition
+   - not shipped today: one line per candidate addition, unnumbered. To ship one, name its path in the reply.
    - `previously skipped (n)`
 4. Reply syntax: `1 3 5` · `recommended` · `all` (Take + Your call) · `none` · `7?` (full diff of item 7) · `skipped?` (list skip-list entries, unnumbered; naming an entry brings it back into the menu).
 
