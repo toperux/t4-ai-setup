@@ -286,7 +286,10 @@ install_toolchain() {
   if ! have graphify; then
     if have uv; then
       say "Installing graphify"
-      uv tool install graphifyy || warn "graphify installation failed."
+      # Pinned: left to itself uv can pick or download Python 3.15, where
+      # graphifyy's tree-sitter pin (<=0.25.2) has no wheels. uv reuses a 3.14
+      # already on the machine and downloads one otherwise. Bump when it does.
+      uv tool install --python 3.14 graphifyy || warn "graphify installation failed."
     else
       warn "uv missing; cannot install graphify."
     fi

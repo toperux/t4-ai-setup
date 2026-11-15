@@ -86,7 +86,7 @@ Command-line tools (each skipped if already on PATH):
 | Tool | Via | Why |
 | --- | --- | --- |
 | `rtk` | winget `rtk-ai.rtk` | **Required.** A hook rewrites shell commands through `rtk hook copilot`. A prebuilt binary — no Rust toolchain needed. Not the crates.io crate of the same name; see the warning below. |
-| `graphify` | `uv tool install graphifyy` | Backs the two graphify hooks. The PyPI package really is spelled with two y's. |
+| `graphify` | `uv tool install --python 3.14 graphifyy` | Backs the two graphify hooks. The PyPI package really is spelled with two y's. |
 | `copilot` | winget `GitHub.Copilot` | The Copilot CLI itself, if you don't already have it. You still log in with your own account. |
 | `git` | winget `Git.Git` | Used by the config backup step. |
 | `py` 3.14 | winget `Python.PythonInstallManager` | Runs the five Python hooks. The script also makes sure a plain `python` resolves, since that is what the hook commands use. |

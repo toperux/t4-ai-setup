@@ -82,7 +82,7 @@ Command-line tools (each skipped if already on PATH):
 | Tool | Via | Why |
 | --- | --- | --- |
 | `rtk` | winget `rtk-ai.rtk` | **Required.** A hook rewrites every Bash tool call through `rtk hook claude`. Without it on PATH, every Bash call fails. A prebuilt binary — no Rust toolchain needed. Not the crates.io crate of the same name; see the warning below. |
-| `graphify` | `uv tool install graphifyy` | Backs the bundled graphify skill and its two hooks. The PyPI package really is spelled with two y's. |
+| `graphify` | `uv tool install --python 3.14 graphifyy` | Backs the bundled graphify skill and its two hooks. The PyPI package really is spelled with two y's. |
 | `claude` | `https://claude.ai/install.ps1` | Claude Code itself. Anthropic's own installer: user scope, no elevation, SHA256-verified against a signed manifest. Only when missing — an existing install is never upgraded, and a running one is never replaced, because a running one isn't missing. |
 | `git` | winget `Git.Git` | Used by the statusline and by the config backup step. |
 | `py` 3.14 | winget `Python.PythonInstallManager` | Runs the two Python hooks. The script also makes sure a plain `python` resolves, since that is what the hook command uses. |
@@ -129,7 +129,7 @@ want something else:
 
 | Pin | Flag | Why |
 | --- | --- | --- |
-| Python 3.14 | `-PythonVersion` | Latest stable minor. Revisit when 3.15 ships. |
+| Python 3.14 | `-PythonVersion` | Also the interpreter graphify is installed on: its tree-sitter pin has no 3.15 wheels. Revisit when it does. |
 
 .NET is not pinned — the newest LTS still in active or maintenance support is
 resolved at run time from Microsoft's official releases index.

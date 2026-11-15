@@ -96,7 +96,7 @@ Each is skipped if already on PATH:
 | Tool | Via | Why |
 | --- | --- | --- |
 | `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook routes every Bash tool call through `rtk hook claude`. From **git, not crates.io** — see the warning below. |
-| `graphify` | `uv tool install graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
+| `graphify` | `uv tool install --python 3.14 graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
 | `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` | Claude Code itself. Anthropic's own installer: user scope, checksum-verified, lands in `~/.local/bin`, and refuses to run under `sudo`. Only when missing — an existing install is never upgraded, and a running one is never replaced, because a running one isn't missing. |
 | `git`, `jq`, `curl`, `python3` | distro package manager | Backup step, JSON wrangling, hooks. |
 | `rustup` | `sh.rustup.rs` | Provides `cargo` (for `rtk`) and `rust-analyzer`. |

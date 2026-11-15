@@ -37,7 +37,8 @@ command is missing.
               official releases-index.json.
 
   Pinned, needs a human bump:
-    Python  -PythonVersion  3.14  (latest stable; revisit when 3.15 ships)
+    Python  -PythonVersion  3.14  (also the interpreter graphify is installed on;
+                                  revisit when tree-sitter ships 3.15 wheels)
 #>
 [CmdletBinding()]
 param(
@@ -594,7 +595,10 @@ function Install-Toolchain {
     # graphify: backs the bundled graphify skill and its two hooks. The PyPI
     # package is 'graphifyy' (two y's); plain 'graphify' does not exist.
     if (-not (Get-Command graphify -ErrorAction SilentlyContinue)) {
-        Invoke-Native { & uv tool install graphifyy }
+        # --python: left to itself uv picks the interpreter, and with none it
+        # likes it downloads the newest (3.15), where graphifyy's tree-sitter
+        # pin (<=0.25.2) has no wheels and the install dies building from source.
+        Invoke-Native { & uv tool install --python $PythonVersion graphifyy }
         if ($LASTEXITCODE -ne 0) {
             throw "graphify installation failed."
         }

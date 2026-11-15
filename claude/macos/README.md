@@ -104,7 +104,7 @@ Each is skipped if already on PATH:
 | Homebrew | `raw.githubusercontent.com/Homebrew/install` | Everything below it. `brew shellenv` is also **persisted** to your profile, which the Homebrew installer itself only prints as an instruction. |
 | `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` | Claude Code itself. The plugin step can do nothing without it. |
 | `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook routes every Bash tool call through `rtk hook claude`. From **git, not crates.io** — see the warning below. |
-| `graphify` | `uv tool install graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
+| `graphify` | `uv tool install --python 3.14 graphifyy` | Backs the bundled skill and its two hooks. The PyPI package really is spelled with two y's. |
 | `git`, `jq`, `python`, `uv`, `node` | `brew install` | Backup step, JSON wrangling, hooks, graphify, the TypeScript server. |
 | `rustup` | `sh.rustup.rs` | Provides `cargo` (for `rtk`) and `rust-analyzer`. From rustup.rs rather than Homebrew so `rustup component add` behaves as it does on the other platforms. |
 | .NET SDK | `dotnet-install.sh --channel LTS` | Needed for `csharp-ls`. Microsoft's own script, and `LTS` is a first-class channel meaning "the most recent Long Term Support release" — so the version policy is named directly and needs no editing when .NET 11 ships. Installs under `$HOME/.dotnet` with no `sudo`. Best-effort; `csharp-ls` is the only casualty if it doesn't land. |

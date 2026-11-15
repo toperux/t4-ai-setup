@@ -98,7 +98,7 @@ Each is skipped if already on PATH. Nothing you already have is upgraded.
 | --- | --- | --- |
 | `copilot` | `curl -fsSL https://gh.io/copilot-install \| bash` | The Copilot CLI. GitHub's own installer rather than `npm i -g @github/copilot`: it is a single static binary with no Node requirement, and as a normal user it lands in `$HOME/.local/bin` with no `sudo`. You still log in with your own account. |
 | `rtk` | `cargo install --git https://github.com/rtk-ai/rtk --locked` | **Required.** A hook routes shell commands through `rtk hook copilot`. From **git, not crates.io** — see the warning below. |
-| `graphify` | `uv tool install graphifyy` | Backs the two graphify hooks. The PyPI package really is spelled with two y's. |
+| `graphify` | `uv tool install --python 3.14 graphifyy` | Backs the two graphify hooks. The PyPI package really is spelled with two y's. |
 | `git`, `python3`, `jq`, `curl` | distro package manager | Backup step, the five hooks, JSON wrangling. |
 | `uv` | `astral.sh/uv/install.sh` | Installs graphify. |
 | `rustup` | `sh.rustup.rs` | Provides `cargo` (for `rtk`) and `rust-analyzer`. |
