@@ -8,6 +8,7 @@ Contributor-facing notes. Nothing here is needed to install anything — see the
 ```
 .gitattributes                 `* -text` — config files ship byte for byte
 .gitignore
+.claude/                       maintainer skills for this repo, not installed
 install-claude-windows.ps1     entry point, downloads this repo and runs the installer
 install-claude-wsl.sh
 install-claude-macos.sh
