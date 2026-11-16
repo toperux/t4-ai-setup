@@ -82,5 +82,5 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **ponytail** → where it conflicts with this file, this file wins.
 
 # rtk
-A hook transparently rewrites shell commands through `rtk` (token-optimized proxy) — no action needed. Meta commands: `rtk gain` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (raw passthrough for debugging).
+A hook transparently rewrites shell commands through `rtk` (token-optimized proxy). Meta commands: `rtk gain` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (raw passthrough for debugging).
 
