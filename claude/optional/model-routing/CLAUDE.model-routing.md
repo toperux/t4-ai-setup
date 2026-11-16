@@ -8,12 +8,13 @@ Prices ($/M tokens, in/out, checked 2026-11-15): Fable 5.2 8/40 · Opus 5.5 4/20
 | Orchestration, plan mode, spec refinement, review of subagent diffs, smoke-test triage | main session | Fable | set via `/effort` |
 | Implementing a planned change, writing tests | `coder` agent | Opus | high |
 | Running gates / tests, reporting output | `tester` agent | Sonnet | low |
-| Searches, lookups, file inventories | `finder` agent | Haiku | low |
-| Doc edits, writing one-off scripts, big-file reads | `scribe` agent | Sonnet | low |
+| Searches, lookups, file inventories, big-file reads with a pointed question | `finder` agent | Haiku | low |
+| Big-file reads that need judgment (open-ended summary, review, finding inconsistencies) | `finder` with `model: "sonnet"`, `effort: "medium"` | Sonnet | medium |
+| Doc edits, writing one-off scripts | `scribe` agent | Sonnet | low |
 
 Rules:
 
-- Agent defs in the `agents/` folder beside this CLAUDE.md (`~/.claude/agents/` by default) carry model + effort — use `subagent_type: "coder" | "tester" | "finder" | "scribe"` and don't re-pass `model` unless overriding. A project can override any of them with a same-named def in its own `.claude/agents/`.
+- Agent defs in the `agents/` folder beside this CLAUDE.md (`~/.claude/agents/` by default) carry model + effort — use `subagent_type: "coder" | "tester" | "finder" | "scribe"` and don't re-pass `model` or `effort` unless overriding. A project can override any of them with a same-named def in its own `.claude/agents/`.
 - Built-in agent types (`Explore`, `Plan`, `general-purpose`, `claude`, `claude-code-guide`) aren't pinned by these defs and can resolve to the main session model. Prefer the defs above; if a built-in is needed, always pass `model:` explicitly.
 - Never use `subagent_type: "fork"` for coding work — fork ignores `model` and runs on the main session model.
 - Small edits (one file, ≤20 lines) the main session does directly; spawning an agent costs more than the edit.
