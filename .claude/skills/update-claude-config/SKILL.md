@@ -91,7 +91,7 @@ Same layout and reply syntax as `sync-claude-config`:
 
 Post in chat:
 
-1. Summary table `# · file · change · newer side · flag · rec`, grouped **Take → Your call → Skip**, then **Yours** as one compact unnumbered line.
+1. Summary table `# · file · change · newer side · flag · rec`, sorted **Take → Your call → Skip** (the `rec` column names the group; no group-label rows: a narrow terminal prints each as an empty record), then **Yours** as one compact unnumbered line.
 2. Detail bullets for each Take and Your call item: change (live now → repo version, one or two lines) and what it needs (tool, plugin, restart). Skip items one line each, with the reason. Whole file vs hunk is not shown; it depends on the reply and is reported at apply time.
 3. Footer: noise ignored (CRLF, `*.bak`), live-only files left alone (candidate additions from `drift.sh`), `previously skipped (n)`.
 4. Reply syntax: `1 3 5` · `recommended` · `all` · `none` · `7?` (full diff of item 7) · `skipped?` (list skip-list entries, unnumbered) · `yours?` (expand the Yours line).

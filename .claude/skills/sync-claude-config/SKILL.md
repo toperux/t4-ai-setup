@@ -103,7 +103,7 @@ Before building the menu, read `skipped.local.md` (next to this file) if it exis
 
 Post in chat:
 
-1. Summary table `# · file · change · newer side · flag · rec` (newer side = `live`, `repo` or `removed`, from the Direction rules, with the date when known), grouped **Take → Your call → Skip**, then **Personal — not offered** as one compact unnumbered line.
+1. Summary table `# · file · change · newer side · flag · rec` (newer side = `live`, `repo` or `removed`, from the Direction rules, with the date when known), sorted **Take → Your call → Skip** (the `rec` column names the group; no group-label rows: a narrow terminal prints each as an empty record), then **Personal — not offered** as one compact unnumbered line.
    - Personal / machine items get no number and cannot be picked. They are worked out again on every run.
 2. Detail bullets for each Take and Your call item: change (before → after, one or two lines), lands in, also touches. Skip items stay one line each, with the reason. Repo-ahead items show the repo's value.
 3. Footer:
