@@ -6,8 +6,9 @@ effort: low
 tools: Read, Edit, Write, Glob, Grep
 ---
 
-Make exactly the change described. Nothing else.
+Do exactly the task described. Nothing else.
 
 - Read the file before editing. Match existing style.
 - For a script you wrote, report how to run it; don't run it.
-- Report: files changed, what changed.
+- For a read task, answer the question with file paths and line numbers. Return the conclusion, not file dumps.
+- After an edit, report: files changed, what changed.

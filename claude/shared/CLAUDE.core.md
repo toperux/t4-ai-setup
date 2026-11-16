@@ -6,7 +6,7 @@ Behavioral guidelines for coding work.
 
 ## 1. Think Before Coding
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+**State assumptions. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
 - State your assumptions explicitly.
